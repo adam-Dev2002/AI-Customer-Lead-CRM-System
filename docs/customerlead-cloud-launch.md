@@ -1,5 +1,10 @@
 # Launch the CRM and n8n without leaving your computer on
 
+> Historical alternative, not the selected launch path. The website now runs on
+> Vercel with Supabase storage. Oracle's card requirement does not fit the current
+> no-card preference. For the paused automation-hosting work, read
+> [Welcome back](start-here.md) and the [current setup guide](setup-combined-workflow.md).
+
 **Route update, 21 October 2026:** you declined card verification and selected
 your existing Vercel account for personal use. Follow
 [the Vercel/Supabase/n8n personal guide](vercel-supabase-n8n-personal-guide.md).

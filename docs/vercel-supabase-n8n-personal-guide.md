@@ -1,5 +1,12 @@
 # Personal project: Vercel, Supabase and hosted n8n
 
+> **Superseded planning guide.** The website is now deployed to Vercel and uses
+> Supabase. Northflank asked this account for a payment card, so the no-card route
+> below is blocked and automation hosting is paused. Use
+> [Welcome back](start-here.md) and the [illustrated combined-workflow guide](setup-combined-workflow.md)
+> for current setup and the remaining handover. Do not repeat the completed CRM
+> import or create a new Vercel project based on the earlier status below.
+
 Reviewed 21 October 2026, Singapore time. This is a setup guide, not a completed
 deployment. It uses your existing Vercel and Supabase accounts. Your requirements
 are personal use, no payment card and operation without this PC staying on.

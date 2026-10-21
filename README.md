@@ -9,6 +9,19 @@ consented follow-ups and monitors confirmed delivery from the dashboard.
 Approving a draft does not send it; delivery requires the separate sending action
 and a confirmed Gmail result.
 
+## Start here
+
+Returning to the project? Read [Welcome back](docs/start-here.md) for the current
+checkpoint and what remains. The website and Supabase are set up; hosting the
+local n8n automation is still pending.
+
+The [illustrated setup guide](docs/setup-combined-workflow.md) follows the selected
+**128-node combined Gemini workflow**, with fictional customers, seven dashboard
+pictures, Sheet headers and an inactive workflow example with account bindings
+removed. Use it for a fresh practice setup; keep the existing live workspace.
+
+![CustomerLead dashboard with fictional demo data](docs/images/setup/dashboard.png)
+
 ## Project layout
 
 | Path | Purpose |
@@ -34,8 +47,8 @@ pnpm install --frozen-lockfile
 
 Copy `.env.example` to `.env.local` and configure the values privately. Existing
 installations must retain their current environment and cloud workspace.
-See [authentication setup](docs/login-and-assistant.md) and
-[Supabase and hosting setup](docs/vercel-supabase-n8n-personal-guide.md).
+See the [step-by-step setup](docs/setup-combined-workflow.md) and
+[authentication reference](docs/login-and-assistant.md).
 
 ```sh
 pnpm dev --hostname 127.0.0.1 --port 3001
@@ -52,7 +65,7 @@ For Vercel, import this repository and set **Root Directory** to
 Supabase hosts authentication, CRM storage and private files. Host the existing
 n8n automation separately; Vercel does not run its background schedules.
 
-Follow the [Vercel, Supabase and n8n guide](docs/vercel-supabase-n8n-personal-guide.md).
+Follow the [setup and hosting guide](docs/setup-combined-workflow.md).
 Publishing source code does not deploy the application or activate workflows.
 
 ## Verification

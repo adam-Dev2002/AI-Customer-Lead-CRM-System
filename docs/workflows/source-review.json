@@ -1,0 +1,15 @@
+{
+  "reviewedOn": "2026-10-21",
+  "sourceFile": "ClearFlow — Customer support, leads & dashboard (Gemini only).json",
+  "sourceSha256": "13c6167752c025c00971a1c34c24976ddebd2ece0baede8a153bb5c1de2d2773",
+  "sourceNodes": 128,
+  "exampleSha256": "c1583791aa7c59bcabac9e6d5cf5accc026f7bf026c8e249a446976ca3c4f398",
+  "exampleNodes": 128,
+  "changes": [
+    "Inactive; no pinned execution data",
+    "Removed account/credential bindings and instance metadata",
+    "Replaced spreadsheet IDs, cached tab references, CRM origin and literal email addresses",
+    "New demo node/form IDs; original connection graph retained",
+    "Made existing 5-minute/hourly schedule defaults explicit"
+  ]
+}

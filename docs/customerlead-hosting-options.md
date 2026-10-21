@@ -1,5 +1,11 @@
 # CustomerLead hosting options
 
+> Earlier planning reference. The website is now on Vercel and the CRM is in
+> Supabase. Automation hosting is paused: Northflank asked this account for a
+> payment card. Start with the [current handover](start-here.md) and
+> [automation hosting checklist](setup-combined-workflow.md#7-when-you-are-ready-to-host-the-automation).
+> Older local-storage and no-deployment statements below describe earlier work.
+
 Maintainer guide. Reviewed on 21 October 2026, Singapore time.
 
 Latest preference: existing Vercel account, personal/non-commercial use, no card

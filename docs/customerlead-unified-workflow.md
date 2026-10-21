@@ -1,5 +1,11 @@
 # One CustomerLead workflow
 
+> Historical consolidation notes from 20 October. The selected current export
+> has **128 nodes** and was exported as active. Use [Welcome back](start-here.md)
+> and the [current illustrated guide](setup-combined-workflow.md) for today's
+> setup. The inactive 123-node draft and three-active-originals state described
+> below are earlier checkpoints. CRM storage now uses Supabase.
+
 Maintainer guide, 20 October 2026. The customer continues to use the existing dashboard.
 
 The consolidated file is `private-integrations/customerlead-unified-gemini.json`, named **ClearFlow — Customer support, leads & dashboard (Gemini only)**. It combines the three selected Downloads exports into one inactive workflow. The three originals are retained for rollback. Importing this draft does not switch the running automation.
