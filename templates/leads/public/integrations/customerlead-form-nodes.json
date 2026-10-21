@@ -1,0 +1,64 @@
+{
+  "name": "CustomerLead — Form inquiry to CRM (2 nodes)",
+  "nodes": [
+    {
+      "id": "808859b6-0db8-43f4-8218-bc341101f34d",
+      "name": "Form captured",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst p = {...$json};\nif (!p.Lead_ID) throw new Error('Connect this adapter after SHEETS — Append Customer Lead.');\nconst classification = String(p.Notes || '').match(/^AI category:\\s*(Sales|Quote|Booking|General)\\.\\s*(.+)$/s);\nif (classification) { p.Category ||= classification[1]; p.AI_Summary ||= classification[2]; }\nreturn {json:{eventId:$execution.id + ':form:' + p.Lead_ID,type:'lead.upsert',data:{...p,Create_Only:true}}};\n"
+      },
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "50a6d589-b1ea-4cde-bb70-91449fb39d3b",
+      "name": "Publish Form captured",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        320,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    }
+  ],
+  "connections": {
+    "Form captured": {
+      "main": [
+        [
+          {
+            "node": "Publish Form captured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

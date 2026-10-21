@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CustomerLead — Two-workflow setup and testing guide</title>
+<style>
+@page { size: A4; margin: 17mm 15mm 17mm; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #172033; font: 10pt/1.43 Arial, sans-serif; background: #fff; }
+.page { height: 259mm; break-after: page; position: relative; }
+.page:last-child { break-after: auto; }
+.eyebrow { color: #6941c6; text-transform: uppercase; letter-spacing: 1.5px; font-size: 8pt; font-weight: bold; margin: 0 0 9mm; }
+h1 { font-size: 37pt; line-height: 1.08; letter-spacing: -1.4px; margin: 0 0 7mm; color: #172033; }
+h2 { font-size: 22pt; line-height: 1.15; letter-spacing: -.5px; margin: 0 0 5mm; }
+h3 { color: #5631a6; font-size: 11pt; margin: 5mm 0 2mm; }
+p { margin: 0 0 3mm; }
+ul, ol { margin: 2mm 0 4mm; padding-left: 6mm; }
+li { margin: 0 0 2mm; padding-left: .7mm; }
+strong { color: #172033; }
+a { color: #5932b4; text-decoration: underline; overflow-wrap: anywhere; }
+code { font: 8.4pt/1.4 Consolas, monospace; overflow-wrap: anywhere; }
+pre { margin: 3mm 0 4mm; padding: 3.5mm; background: #f4f1fb; border: 1px solid #dfd6f4; border-radius: 2mm; white-space: pre-wrap; overflow-wrap: anywhere; font: 8.4pt/1.45 Consolas, monospace; }
+table { width: 100%; border-collapse: collapse; margin: 3mm 0 4mm; font-size: 9pt; line-height: 1.35; }
+th, td { text-align: left; padding: 2.5mm 2.7mm; border-bottom: 1px solid #e3e5eb; vertical-align: top; overflow-wrap: anywhere; }
+th { background: #f3f0fa; color: #50318b; font-size: 8pt; }
+tr { break-inside: avoid; }
+.small { font-size: 8.5pt; color: #596176; }
+.lede { font-size: 13pt; line-height: 1.5; color: #596176; }
+.box { padding: 4mm; border: 1px solid #ddd6ed; border-radius: 2.5mm; margin: 4mm 0; background: #faf8fe; }
+.box p:last-child { margin-bottom: 0; }
+.attention { border-left: 1.5mm solid #c18026; background: #fff8ec; border-color: #ead5b3; }
+.pass { border-left: 1.5mm solid #168465; background: #f0faf6; border-color: #cde9dc; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+.grid .box { margin-top: 0; }
+.tag { display: inline-block; padding: 1.5mm 3mm; background: #eee7fb; color: #5932a7; border-radius: 20mm; font-size: 8pt; font-weight: bold; }
+.flow { display: flex; align-items: stretch; gap: 2.5mm; margin: 5mm 0; }
+.flow .node { flex: 1; padding: 4mm 3mm; border: 1px solid #ddd6ef; border-radius: 2mm; background: #f6f2fd; font-size: 9pt; text-align: center; }
+.flow .arrow { display: flex; align-items: center; color: #8259c6; font-size: 15pt; }
+.step { font-weight: bold; font-size: 8pt; color: #8056bf; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3mm; }
+.rule { border-top: 1px solid #e2deeb; margin: 6mm 0; }
+.check { display: inline-block; width: 3mm; height: 3mm; border: 1px solid #8c80a3; margin-right: 2mm; vertical-align: -.3mm; }
+.cover-title { margin-top: 10mm; }
+.cover-bottom { position: absolute; bottom: 0; width: 100%; padding-top: 5mm; border-top: 1px solid #ddd6ed; }
+.compact td { padding-top: 2mm; padding-bottom: 2mm; }
+.nowrap { white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<section class="page">
+<p class="eyebrow">CustomerLead · Local integration handbook · 19 October 2026</p>
+<span class="tag">TWO-WORKFLOW SETUP</span>
+<h1 class="cover-title">AI customer support<br>+ lead inquiry CRM</h1>
+<p class="lede">A step-by-step guide to connect n8n, Google Sheets and your dashboard — then test AI, automatic emails and owner-sent replies together.</p>
+<div class="flow"><div class="node"><strong>1 · Capture</strong><br>Form or Gmail inquiry</div><div class="arrow">→</div><div class="node"><strong>2 · Process</strong><br>AI + lead record</div><div class="arrow">→</div><div class="node"><strong>3 · Review</strong><br>Dashboard + reply</div><div class="arrow">→</div><div class="node"><strong>4 · Deliver</strong><br>Gmail + confirmation</div></div>
+<div class="box"><h3 style="margin-top:0">The two workflows in this guide</h3><p><strong>Workflow 1:</strong> your original AI support and lead-capture automation.</p><p><strong>Workflow 2:</strong> the prepared <strong>Dashboard sync and manual Gmail sending</strong> bridge. It combines the previous sync bridge and separate sender into one workflow.</p></div>
+<div class="box attention"><p><strong>Before the first live test:</strong> use only email addresses you control. Your saved main-workflow flags are already true, but its <code>owner_email</code> still contains <code>owner@example.com</code>. Replace that placeholder first.</p></div>
+<div class="cover-bottom"><p><strong>Start here:</strong> follow pages 3–7 for setup, then pages 8–11 for the tests.</p><p class="small">This guide and the accompanying workflow contain no API keys or CRM tokens. The guide was prepared from a read-only inspection of the saved n8n workflows and local CRM. No live email was sent during preparation.</p></div>
+</section>
+
+<section class="page">
+<p class="eyebrow">01 · Understand the system</p><h2>What each workflow does</h2>
+<div class="grid"><div class="box"><h3 style="margin-top:0">Workflow 1 · Original automation</h3><p>Accepts form inquiries and scans Gmail. It validates leads, uses AI, saves form leads in Sheets, creates Gmail support drafts, sends configured form acknowledgements/owner alerts, and checks eligible follow-ups.</p><p>Event publisher nodes report those saved results to the dashboard.</p></div><div class="box"><h3 style="margin-top:0">Workflow 2 · Combined bridge</h3><p>Reads owner changes from the dashboard and updates the shared lead/review rows. It also claims replies that the owner approved and explicitly confirmed for sending.</p><p>It sends through Gmail and reports the result back to the dashboard.</p></div></div>
+<div class="flow"><div class="node">Customer<br>form / email</div><div class="arrow">→</div><div class="node">Workflow 1<br>AI + outcomes</div><div class="arrow">→</div><div class="node">Dashboard<br>Leads / Inbox</div></div>
+<div class="flow"><div class="node">Owner edits<br>or confirms reply</div><div class="arrow">→</div><div class="node">Workflow 2<br>sync + sending</div><div class="arrow">→</div><div class="node">Sheets / Gmail<br>confirmed result</div></div>
+<table><thead><tr><th>Action</th><th>What it means</th></tr></thead><tbody>
+<tr><td><code>lead_ai_enabled: true</code></td><td>Allows AI classification of form inquiries. It does not by itself create an AI reply for the form branch.</td></tr>
+<tr><td><code>send_emails_enabled: true</code></td><td>Allows the original workflow’s configured automatic form emails and eligible follow-ups.</td></tr>
+<tr><td><strong>Approve reply</strong></td><td>Records your review. This action does not queue a send.</td></tr>
+<tr><td><strong>Send via Gmail → confirm</strong></td><td>Queues that exact approved reply for the bridge to send. This manual action is separate from the automatic-email switch.</td></tr>
+<tr><td><strong>Applied / Sent</strong></td><td>Applied means an external update succeeded. Sent means Gmail returned a successful send result; it is not a read receipt.</td></tr>
+</tbody></table>
+<div class="box pass"><p><strong>Keep two production workflows:</strong> use the combined bridge from this guide instead of the old bridge and standalone Gmail sender. Keep those older copies inactive as backups. The small health-test workflow may remain as an inactive helper.</p></div>
+</section>
+
+<section class="page">
+<p class="eyebrow">02 · Prepare the empty sheet</p><h2>Keep your headers and start fresh</h2>
+<p>You cleared the data rows in Google Sheets. That is suitable for a fresh test. Keep row 1, your existing columns, the <strong>Leads</strong> tab and the <strong>ReplyReviews</strong> tab.</p>
+<table class="compact"><thead><tr><th>Location</th><th>Value</th></tr></thead><tbody>
+<tr><td>Document</td><td><strong>AI-SUPPORT CRM WORKFLOW</strong></td></tr>
+<tr><td>Spreadsheet ID</td><td><code>1IugQXIcteoSLJ0aACmG8A5eSb6vl-CvelPWg9b4K8-Y</code></td></tr>
+<tr><td>Your browser</td><td><a href="http://localhost:3001">CRM: http://localhost:3001</a><br><a href="http://localhost:5678">n8n: http://localhost:5678</a></td></tr>
+<tr><td>From n8n in Docker</td><td><code>http://host.docker.internal:3001</code></td></tr>
+</tbody></table>
+<h3>Required Leads headers — preserve any extra columns</h3>
+<pre>Lead_ID, Created_At_UTC, Name, Email, Phone, Service, Message,
+Source, Consent, Status, Priority, Follow_Up_Due_UTC,
+Follow_Up_State, Follow_Up_Sent_UTC, Owner, Notes,
+Acknowledgement_Status, Owner_Alert_Status,
+Category, AI_Summary, Gmail_Thread_ID</pre>
+<h3>Required ReplyReviews headers</h3>
+<pre>Draft_ID, Lead_ID, Gmail_Draft_ID, Gmail_Thread_ID,
+Email, Subject, Body, Review_Status, Updated_At_UTC</pre>
+<ol><li>Open the spreadsheet and confirm both tab names and the header spelling above.</li><li>Start Docker Desktop and confirm the <strong>n8n</strong> container is running.</li><li>Keep the CRM server running. If needed, run this in PowerShell:</li></ol>
+<pre>Set-Location C:\Projects\ai-customer-lead-dash
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local.ps1 -Template leads</pre>
+<div class="box attention"><p><strong>Clearing Sheets does not clear the CRM.</strong> The dashboard saves its own records locally. Existing sample cards and the earlier CRM Wiring Test can still appear. Use a fresh test name/service and search for it. Do not delete your local CRM data file for this test.</p></div>
+<p class="small">Docker’s <a href="https://docs.docker.com/desktop/features/networking/">host.docker.internal</a> address reaches the Windows host from the container. Inside Docker, localhost refers to the container itself.</p>
+</section>
+
+<section class="page">
+<p class="eyebrow">03 · Workflow 1 configuration</p><h2>Enable AI and automatic emails</h2>
+<ol><li>Open your original <strong>AI CUSTOMER SUPPORT + LEAD CAPTURE CRM … ONE WORKFLOW</strong>.</li><li>Open <strong>CONFIG — BUSINESS SETTINGS (EDIT HERE)</strong>.</li><li>Keep the rest of its code and update the relevant values. Your saved draft already has the four flags shown below enabled.</li></ol>
+<pre>send_emails_enabled: true,
+send_customer_ack: true,
+send_customer_follow_up: true,
+lead_ai_enabled: true,
+follow_up_hours: 24</pre>
+<ol start="4"><li>Replace <code>owner@example.com</code> with an owner-notification address you control. Enter the correct business name, phone, website and response expectation.</li><li>Confirm <code>sheet_id</code> matches page 3 and <code>sheet_tab</code> is <code>Leads</code>.</li><li>Use a <code>lead_ai_model</code> available to your Gemini account. A model name in a saved workflow is not proof that your account can call it.</li><li>Open <strong>LEADS — Gemini Classify (Optional)</strong> and select the existing Gemini Header Auth credential. Its header name should be <code>x-goog-api-key</code>; its value is your Gemini key.</li></ol>
+<div class="box attention"><p><strong>Use the right credential:</strong> the Gemini node needs its Gemini API credential, not the CRM bearer credential. The inspected node also has a manually entered API-key header. Remove the duplicate manual key header when the selected credential supplies it; keep the key in the credential.</p></div>
+<h3>Check the receiving-email branch too</h3>
+<p>Open <strong>CONFIG — BUSINESS, FAQ &amp; AI MODELS</strong>. Use the same business identity, a verified AI model and your controlled test-sender address in the Gmail query. Preserve its existing processed/processing-label exclusions.</p>
+<p>For the Gmail test on page 10, restrict the query to your second test address and a subject containing <strong>CRM TEST</strong>. Confirm <strong>START — Every 5 Minutes</strong> actually has the intended interval; a node’s name alone does not set its schedule.</p>
+<div class="box"><p><strong>Current control source:</strong> n8n has not read the dashboard’s shared settings yet. The dashboard currently has AI on and automatic form emails off. For the first tests, the original n8n config is authoritative. Page 12 explains connecting dashboard settings later.</p></div>
+</section>
+
+<section class="page">
+<p class="eyebrow">04 · Workflow 1 event wiring</p><h2>Make results visible in the dashboard</h2>
+<p>Use the prepared adapters; you do not need to recreate the original automation. Open <a href="http://localhost:3001/automation#connection">Automation → connection setup</a> for the downloads.</p>
+<ol><li><strong>Form capture already exists:</strong> keep <strong>Form captured → Publish Form captured</strong> after <strong>SHEETS — Append Customer Lead</strong>. Keep its existing email-gate connection too. Do not add the pair twice.</li><li>For Gmail inquiries, click <strong>Copy email inquiry nodes</strong>. Click an empty area of the original n8n canvas and paste.</li><li>For the other outcomes below, import <strong>customerlead-event-adapters.json</strong> into a temporary helper, then copy the required adapter/publisher pairs into the original workflow. The temporary helper stays inactive.</li></ol>
+<table><thead><tr><th>Attach a new outgoing connection after</th><th>Adapter → publisher pair</th></tr></thead><tbody>
+<tr><td><strong>SHEETS — Save Initial Email Results</strong></td><td><strong>Initial email results</strong> → Publish Initial email results</td></tr>
+<tr><td><strong>Gmail — Create Draft (NEVER SEND)</strong></td><td><strong>Email support processed</strong> → Publish Email support processed</td></tr>
+<tr><td><strong>Gmail — Label No-Draft Outcome</strong></td><td>A second copy of the same <strong>Email support processed</strong> pair</td></tr>
+<tr><td><strong>SHEETS — Reserve Follow-Up</strong></td><td><strong>Follow-up reserved</strong> → Publish Follow-up reserved</td></tr>
+<tr><td><strong>SHEETS — Log Follow-Up Outcome</strong></td><td><strong>Follow-up outcome</strong> → Publish Follow-up outcome</td></tr>
+</tbody></table>
+<ol start="4"><li>Select your existing CRM Header Auth credential on <strong>every publisher HTTP node</strong>. It is saved in your n8n as <strong>Header Auth account 2</strong> — the credential previously called “Header Account 2” in our instructions.</li><li>The publisher uses <strong>POST</strong> to <code>http://host.docker.internal:3001/api/n8n/events</code>, with JSON body expression <code>{{ $json }}</code>. Its credential supplies <code>Authorization: Bearer …</code>.</li><li>Save the original workflow. Run the tests manually before publishing its schedules.</li></ol>
+<div class="box pass"><p><strong>Why this matters:</strong> a successful Gmail send or a new Sheet row does not automatically update the CRM. These event publishers report the actual saved outcome. The initial-email publisher updates acknowledgement/owner-alert status; the Gmail publisher supplies the original inquiry and proposed reply together.</p></div>
+<p class="small">Keep source node names used inside adapter code. When copying the no-draft pair, n8n may suffix the copied node names; keep each copied Code node connected to its own publisher.</p>
+</section>
+
+<section class="page">
+<p class="eyebrow">05 · Workflow 2 installation</p><h2>Use one bridge for sync and sending</h2>
+<ol><li>Save or export your current bridge as a backup. Keep the old <strong>Sheets write-back &amp; Gmail draft review bridge</strong> inactive.</li><li>Keep the standalone <strong>owner-confirmed Gmail sender</strong> inactive too. The combined bridge replaces both.</li><li>Download <a href="http://localhost:3001/integrations/customerlead-sync-and-send-bridge.json"><strong>customerlead-sync-and-send-bridge.json</strong></a> and use n8n’s <strong>Import from file</strong> to create the replacement bridge.</li><li>Open <strong>Bridge settings</strong> and check:</li></ol>
+<table class="compact"><thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody>
+<tr><td><code>crmBaseUrl</code></td><td><code>http://host.docker.internal:3001</code></td></tr>
+<tr><td><code>spreadsheetId</code></td><td><code>1IugQXIcteoSLJ0aACmG8A5eSb6vl-CvelPWg9b4K8-Y</code></td></tr>
+<tr><td><code>leadTab</code></td><td><code>Leads</code></td></tr><tr><td><code>reviewTab</code></td><td><code>ReplyReviews</code></td></tr>
+</tbody></table>
+<h3>Select credentials — imported files do not contain them</h3>
+<table><thead><tr><th>Credential</th><th>Nodes that need it</th></tr></thead><tbody>
+<tr><td><strong>Header Auth account 2</strong><br>CRM Header Auth</td><td>Read owner changes<br>Confirm external result<br>Claim approved reply<br>Record prepared draft<br>Confirm Gmail delivery</td></tr>
+<tr><td><strong>Google Sheets account</strong></td><td>Read existing lead<br>Save shared lead<br>Save reply review</td></tr>
+<tr><td><strong>Gmail account</strong><br>Same Gmail OAuth2 account on all six nodes</td><td>Read Gmail draft<br>Update Gmail draft — never send<br>Read sending Gmail account<br>Read Gmail reply context<br>Save confirmed Gmail draft<br>Send confirmed Gmail draft</td></tr>
+</tbody></table>
+<p>For the Gmail HTTP requests choose <strong>Authentication → Predefined Credential Type → Gmail OAuth2</strong>, then your existing Gmail account. CRM requests use <strong>Generic Credential Type → Header Auth</strong>.</p>
+<div class="box attention"><p><strong>One active bridge:</strong> do not enable the old bridge or standalone sender alongside this combined replacement. Use <strong>Manual connection test</strong> for testing and its one-minute schedule only after the tests pass.</p></div>
+</section>
+
+<section class="page">
+<p class="eyebrow">06 · Workflow 2 node settings</p><h2>Finish the Sheets nodes and dry run</h2>
+<p>The inspected old bridge has the Lead_ID read filter, but its two save-node operation/matching settings are missing. The new combined file supplies them. Recheck them if you reselect a document or tab in n8n.</p>
+<h3>Read existing lead</h3>
+<table class="compact"><tbody>
+<tr><th>Field</th><th>Setting</th></tr><tr><td>Operation</td><td><strong>Get Row(s)</strong></td></tr><tr><td>Document / Sheet</td><td><strong>AI-SUPPORT CRM WORKFLOW / Leads</strong></td></tr><tr><td>Filter column</td><td><code>Lead_ID</code></td></tr><tr><td>Filter value — Expression mode</td><td><code>{{ $json.payload.Lead_ID }}</code></td></tr><tr><td>Settings tab</td><td>Keep <strong>Always Output Data</strong> enabled so a missing row can be appended.</td></tr>
+</tbody></table>
+<h3>Both save nodes</h3>
+<table class="compact"><thead><tr><th>Node</th><th>Sheet</th><th>Operation / matching</th></tr></thead><tbody>
+<tr><td><strong>Save shared lead</strong></td><td>Leads</td><td>Append or Update Row<br>Match on <code>Lead_ID</code></td></tr>
+<tr><td><strong>Save reply review</strong></td><td>ReplyReviews</td><td>Append or Update Row<br>Match on <code>Draft_ID</code></td></tr>
+</tbody></table>
+<p>Use <strong>Map Automatically</strong> for both. Keep the imported RAW cell-format setting so inquiry text is stored as text. You can use From list or retain the imported Bridge settings expressions; both must resolve to the same document and tabs.</p>
+<h3>Dry run with no outgoing replies queued</h3>
+<ol><li>Save the combined bridge and run the full workflow from <strong>Manual connection test</strong>.</li><li><strong>Read owner changes</strong> can return <code>changes: []</code>. That is normal when the dashboard has no unsynced edits.</li><li>The lower path reads the Gmail account and calls <strong>Claim approved reply</strong>. With an empty queue, expect <code>job: null</code>; its false branch ends normally.</li><li>Open <a href="http://localhost:3001/automation#manual-email">Automation → Email inquiries &amp; manual Gmail replies</a>. Refresh status and check that your sending address and recent poll time appear.</li></ol>
+<div class="box pass"><p><strong>Pass:</strong> authenticated polling works, the correct Gmail account is registered, and no email is sent by the empty-queue run. Nodes on branches with no items do not all need to turn green.</p></div>
+</section>
+
+<section class="page">
+<p class="eyebrow">07 · Test 1</p><h2>Submit one form with AI + email on</h2>
+<p class="step">Use the fresh sheet · Use your own test inbox · No follow-up permission yet</p>
+<ol><li>In the original workflow, choose <strong>FORM — Customer Inquiry</strong> as the test start. Run <strong>Execute Workflow</strong>, then submit its <strong>Test URL</strong>. Executing only the form node does not run the downstream automation. See <a href="https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.formtrigger/">n8n’s Form Trigger guide</a>.</li><li>Complete the form using the values below. Replace the address with an inbox you control.</li></ol>
+<table class="compact"><thead><tr><th>Form field</th><th>Test value</th></tr></thead><tbody>
+<tr><td>Full Name</td><td><strong>CRM Test Form 01</strong></td></tr><tr><td>Email Address</td><td>Your controlled customer-test inbox</td></tr><tr><td>Phone Number</td><td>Optional test number</td></tr><tr><td>Service Needed</td><td><strong>Kitchen sink quote — test 01</strong></td></tr><tr><td>Message</td><td>“Please provide a quote to inspect a leaking kitchen sink. This is an integration test.”</td></tr><tr><td>Follow-up Permission</td><td><strong>No — do not send me a follow-up</strong></td></tr>
+</tbody></table>
+<ol start="3"><li>In n8n, check the AI gate takes its true route and <strong>LEADS — Gemini Classify (Optional)</strong> receives a successful Gemini response. Inspect the parsed classification; a populated default category alone is not proof that AI succeeded.</li><li>Check <strong>SHEETS — Append Customer Lead</strong> saves one fresh row. Copy that row’s <strong>Lead_ID</strong> for all later comparisons.</li><li>Check <strong>Publish Form captured</strong> returns <code>accepted: true</code>. The first new event normally returns <code>duplicate: false</code>.</li><li>Open <a href="http://localhost:3001/leads">Leads</a> or <a href="http://localhost:3001/inbox">Inbox</a>, refresh, and search for <strong>CRM Test Form 01</strong>. Check name, request, category, summary and priority.</li><li>Check the customer-test inbox receives the acknowledgement, and the configured owner-test inbox receives the alert. Check the Sheet’s <strong>Acknowledgement_Status</strong> and <strong>Owner_Alert_Status</strong>.</li><li>After the <strong>Initial email results</strong> publisher runs, check those outcomes appear on the dashboard’s lead details too.</li></ol>
+<div class="box pass"><p><strong>Pass:</strong> one new Sheet row, one matching dashboard lead, a successful AI response, the expected acknowledgement/owner alert, and recorded outcomes. There should be no automatic follow-up for this non-consented test.</p></div>
+<p class="small">If you repeat the test, change the service suffix to test 02, test 03, etc. The original workflow performs duplicate checks. AI wording/category may vary; validate the response and routing rather than expecting an identical sentence.</p>
+</section>
+
+<section class="page">
+<p class="eyebrow">08 · Tests 2 and 3</p><h2>Edit a lead, then send a manual reply</h2>
+<h3>Test 2 · Dashboard → Sheets</h3>
+<ol><li>Open the new test lead. Choose <strong>Edit lead</strong> and add <strong>Dashboard sync test 01</strong> to Internal notes. Save changes.</li><li>In Automation → External updates, expect a <strong>Pending</strong> update.</li><li>Run the combined bridge’s <strong>Manual connection test</strong>. In Leads, check the same Lead_ID row’s <strong>Notes</strong> changed; no duplicate row should be created.</li><li>Refresh Automation. Expect <strong>Applied</strong>. Resolve a failed update before continuing.</li></ol>
+<h3>Test 3 · Review → confirm → Gmail send</h3>
+<ol><li>Open this same non-consented form lead in Inbox. Choose <strong>Create reply draft</strong>. A form classification alone does not create an AI reply draft.</li><li>Replace the reply placeholder with a real test message, for example: “Thank you for your inquiry. This is our manual reply integration test. Please confirm that you received it.”</li><li>Check the recipient and subject, then choose <strong>Approve reply</strong>. Run the combined bridge until this draft’s review updates show <strong>Applied</strong>. Multiple saved changes may need more than one run.</li><li>Check the sending account shown in Automation. In AI Drafts choose <strong>Send via Gmail</strong>; review From, To, subject and body. Choose <strong>Confirm and queue email</strong>.</li><li>Expect <strong>Queued</strong>. Run the combined bridge again, or let its enabled schedule run after setup is complete. It claims only an approved, confirmed reply whose required sync changes finished.</li><li>Open <strong>Inbox → Outgoing replies</strong>. Expect <strong>Sending</strong>, then <strong>Sent</strong> after Gmail returns a message ID.</li><li>Check both Gmail Sent and the customer-test inbox. The message must arrive once with the confirmed subject/body.</li><li>Run the bridge again to apply the resulting lead update. Check the lead is <strong>Contacted</strong> in the dashboard and Sheets.</li></ol>
+<div class="flow"><div class="node">Approve<br>review only</div><div class="arrow">→</div><div class="node">Confirm send<br>Queued</div><div class="arrow">→</div><div class="node">Bridge + Gmail<br>Sending</div><div class="arrow">→</div><div class="node">Gmail result<br>Sent</div></div>
+<div class="box attention"><p><strong>Do not rerun the send node.</strong> If the result is Needs Review or stays Sending after an execution fails, inspect Gmail Sent and that execution first. The sender uses <a href="https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.drafts/send">Gmail draft sending</a>; sending consumes the draft. A queued reply can be cancelled before it is claimed.</p></div>
+</section>
+
+<section class="page">
+<p class="eyebrow">09 · Test 4</p><h2>Receive a Gmail inquiry and AI draft</h2>
+<p>This test exercises the original workflow’s <strong>email support branch</strong>. Use a second inbox you control as the customer; the receiving Gmail account is the account selected in your n8n Gmail credential.</p>
+<ol><li>In <strong>CONFIG — BUSINESS, FAQ &amp; AI MODELS</strong>, check the business facts, signature, primary provider and available model. Use the controlled test-sender address in <code>gmail_query</code>; preserve the processing/outcome-label exclusions. Add a <strong>CRM TEST</strong> subject restriction for this test.</li><li>Send a new message <strong>from the second test inbox to the connected business Gmail inbox</strong>. Suggested subject: <strong>CRM TEST — Drain inspection 01</strong>. Suggested body: “Can you inspect a blocked kitchen drain? Please let me know what details you need. This is an integration test.”</li><li>In the original workflow, run <strong>START — Manual Test</strong>, which starts the Gmail support path. Alternatively use its configured schedule after publishing. Do not use the form trigger for this email test.</li><li>Inspect the Gmail search/read nodes, sender screening, AI response and <strong>Review AI &amp; Route</strong> result. A valid response can create a draft; a review/skip/failure can take the no-draft branch.</li><li>If a draft is created, check <strong>Gmail — Create Draft (NEVER SEND)</strong> and then <strong>Publish Email support processed</strong>. Open Gmail Drafts and confirm the draft exists.</li><li>Open the dashboard Inbox, select the <strong>Gmail</strong> source and find the test subject/customer. Check the original message and summary. Open <strong>Review reply draft</strong> to see the proposed reply, provider and review reason.</li><li>If it takes the no-draft path, the second publisher after <strong>Gmail — Label No-Draft Outcome</strong> should still create the inquiry in the CRM. Create a manual reply when appropriate.</li><li>To send an approved reply from the dashboard, follow Test 3: approve, sync the review, confirm sending, run the bridge and verify the received message.</li></ol>
+<div class="box pass"><p><strong>Pass:</strong> the original email and its processing outcome appear in the dashboard; a successful draft path also supplies a linked Gmail draft. The support branch creates drafts rather than sending the proposed support reply automatically.</p></div>
+<h3>If Gemini or fallback routing fails</h3>
+<p>The reviewed source has two missing fallback connections. Check and restore:</p>
+<pre>IF — Primary Gemini?  false → AI — OpenAI Primary
+IF — Gemini Valid?    false → AI — OpenAI Backup</pre>
+<p>Use valid credentials and supported models for each provider you enable. The primary Gemini request’s error behavior must reach its parser/fallback instead of stopping the workflow before fallback.</p>
+<p class="small">Receiving an email does not create follow-up permission. Gmail inquiry leads default to no consent. The dashboard shows processed/published inquiries, not a mirror of every message in the mailbox.</p>
+</section>
+
+<section class="page">
+<p class="eyebrow">10 · Test 5</p><h2>Verify one consented follow-up</h2>
+<p>Use a <strong>separate fresh form lead</strong> for this test. Sending a manual reply cancels a pending automatic follow-up, so do not reuse the lead you contacted in Test 3.</p>
+<h3>Normal 24-hour test</h3>
+<ol><li>Submit a fresh form inquiry to your controlled test inbox. Use service <strong>Follow-up test 01</strong> and choose <strong>Yes — one follow-up if my inquiry is still open</strong>.</li><li>Check its Sheet row has <strong>Consent = Yes</strong>, <strong>Status = New</strong>, <strong>Follow_Up_State = Pending</strong> and a valid <strong>Follow_Up_Due_UTC</strong> about 24 hours after capture.</li><li>Leave that inquiry open. Do not mark it Contacted, revoke consent, cancel/reschedule the follow-up, or send a manual reply.</li><li>Publish the original workflow only after the earlier tests pass. Confirm <strong>SCHEDULE — Check Open Leads Hourly</strong> uses a one-hour interval.</li><li>On an hourly scan after the due time, check reservation, one Gmail follow-up and its saved outcome. The scan runs after the due time; it does not guarantee a send at exactly 24 hours.</li></ol>
+<h3>Optional quick test — only your fresh test row</h3>
+<ol><li>In the Sheet, change only this test row’s <strong>Follow_Up_Due_UTC</strong> to a UTC timestamp a few minutes in the past. Keep Consent Yes, Status New, State Pending and Sent timestamp blank.</li><li>Add a temporary <strong>Manual Trigger</strong> to the original canvas, named <strong>TEST — Follow-up review</strong>. Connect it to the existing <strong>TAG — Scheduled Review</strong> node.</li><li>Choose that temporary trigger and execute the full follow-up branch once. It must run configuration, read eligibility, reserve, send and log. Do not execute the Gmail send node by itself.</li><li>Confirm the results below, then remove the temporary trigger. Keep <code>follow_up_hours: 24</code> for normal use; you do not need to lower the business-wide delay.</li></ol>
+<table><thead><tr><th>Where</th><th>Expected result</th></tr></thead><tbody>
+<tr><td>Google Sheets</td><td><code>Follow_Up_State = Sent</code> and a populated <code>Follow_Up_Sent_UTC</code>.</td></tr>
+<tr><td>Customer-test inbox / Gmail Sent</td><td>Exactly one configured follow-up message.</td></tr>
+<tr><td>Dashboard</td><td>Reserved/Sent outcomes appear after their event publishers run.</td></tr>
+<tr><td>Second eligibility scan</td><td>The same Sent row is ineligible and produces no second follow-up.</td></tr>
+</tbody></table>
+<div class="box attention"><p>A Reserved or Needs Review result needs checking before any delivery retry. Keep only one active original automation and one active bridge. This test is for your controlled addresses, not existing customer rows.</p></div>
+</section>
+
+<section class="page">
+<p class="eyebrow">11 · Dashboard settings</p><h2>When do dashboard switches take control?</h2>
+<p><strong>For the tests above, your original n8n config is the source of the AI/email flags.</strong> Flipping a dashboard switch does not rewrite that config automatically. The inspected CRM has not received a shared-configuration read.</p>
+<table class="compact"><thead><tr><th>Dashboard control</th><th>n8n shared-config field</th></tr></thead><tbody>
+<tr><td>AI classification &amp; summaries</td><td><code>lead_ai_enabled</code></td></tr><tr><td>Allow automatic form emails</td><td><code>send_emails_enabled</code></td></tr><tr><td>Customer acknowledgements</td><td><code>send_customer_ack</code></td></tr><tr><td>Owner notifications</td><td><code>send_owner_alert</code></td></tr><tr><td>One consented follow-up</td><td><code>send_customer_follow_up</code></td></tr>
+</tbody></table>
+<h3>Connect shared settings after the first complete test</h3>
+<ol><li>In dashboard Settings, enter correct business/owner details and actual Gemini/OpenAI model IDs for the providers you use. The inspected dashboard model fields are blank. Enable AI and Allow automatic form emails, then save.</li><li>From the adapter kit, copy <strong>Keep inquiry context</strong> and <strong>Read shared CRM configuration</strong> into the original workflow. Wire both form/scheduled tag outputs through those nodes into the <strong>existing</strong> lead-config node:</li></ol>
+<pre>TAG — Form Submission ─┐
+                      ├→ Keep inquiry context
+TAG — Scheduled Review┘    → Read shared CRM configuration
+                            → CONFIG — BUSINESS SETTINGS (EDIT HERE)
+                            → ROUTE — Is Customer Form?</pre>
+<p>Both tag outputs feed Keep inquiry context. The read request is <strong>GET /api/n8n/config</strong> using the CRM Header Auth credential. Keep the original config node’s exact name because downstream nodes reference it.</p>
+<pre>const config = {
+  ...$input.first().json.config,
+  sheet_id: '1IugQXIcteoSLJ0aACmG8A5eSb6vl-CvelPWg9b4K8-Y',
+  sheet_tab: 'Leads'
+};
+return $('Keep inquiry context').all().map(item =&gt;
+  ({json:{...item.json, _cfg:config}}));</pre>
+<ol start="3"><li>Before the email-support <strong>CONFIG — BUSINESS, FAQ &amp; AI MODELS</strong>, add another authenticated config read. Map its Set fields from <code>$json.config</code>, preserving the Gmail label exclusions.</li><li>Verify each send branch actually checks its own shared switch. The original master gate does not implement independent acknowledgement/owner-alert toggles. Disabled branches need Skipped outcomes and result logging.</li></ol>
+</section>
+
+<section class="page">
+<p class="eyebrow">12 · Troubleshooting</p><h2>Find the first failed checkpoint</h2>
+<table class="compact"><thead><tr><th>What you see</th><th>What to check</th></tr></thead><tbody>
+<tr><td>Old leads remain after clearing Sheets</td><td>The CRM stores its own records. Search for the fresh test name/Lead_ID. No database reset is needed.</td></tr>
+<tr><td>Only the form trigger ran</td><td>Use Execute Workflow with the form as start, not Execute Step on the form node alone.</td></tr>
+<tr><td>AI gate is true but no real AI output</td><td>Inspect the classifier request/response, Gemini credential, duplicate key header and available model. A safe default is not a successful AI call.</td></tr>
+<tr><td>Lead saved but no owner alert</td><td>Replace the inspected <code>owner@example.com</code> placeholder. Check the actual Gmail node result and saved status.</td></tr>
+<tr><td>Sheet row exists; no CRM lead</td><td>Check Form captured → publisher, CRM Header Auth, Docker URL and POST body. Expect accepted true.</td></tr>
+<tr><td>401 / 503 from CRM requests</td><td>401: check Authorization header and Bearer value. 503: CRM has not loaded the integration token; configure/restart it.</td></tr>
+<tr><td>Bridge ran but no Sheets write</td><td>No pending change is normal. Make one fresh dashboard edit, then run the full bridge. Check Get Row(s) filter, Append or Update Row, mapping and match columns.</td></tr>
+<tr><td>Saved lead/review duplicates</td><td>Match Leads on Lead_ID and ReplyReviews on Draft_ID. Avoid plain Append for those bridge saves. Resolve duplicate stable IDs before retrying.</td></tr>
+<tr><td>Send via Gmail is disabled</td><td>Use a real non-sample inquiry; finish and approve the reply; register the Gmail account with an empty-queue bridge run.</td></tr>
+<tr><td>Reply stays Queued</td><td>Check the bridge runs, its Gmail/CRM credentials are selected, and all required lead/review sync changes are Applied. Earlier failed changes block later ones.</td></tr>
+<tr><td>Needs Review or a stopped Sending execution</td><td>Check Gmail Sent/Drafts and the n8n execution before another attempt. Never retry the send node. Use “I checked Gmail: not sent” only after verifying it was not sent.</td></tr>
+<tr><td>Gmail inquiry missing</td><td>Check test sender/query/labels/screening and both draft/no-draft publishers. Sending from the same account may be excluded by -from:me.</td></tr>
+<tr><td>Follow-up does not send</td><td>Check consent Yes, status New/Pending, state Pending, valid due time reached, email flags and the hourly branch. A manual reply cancels a pending follow-up.</td></tr>
+<tr><td>Nothing happens automatically</td><td>The inspected workflows were inactive. Save and publish/activate the intended two workflows; use the production form URL after publishing.</td></tr>
+</tbody></table>
+<div class="box"><p><strong>Credential names are labels.</strong> Keep using your working <strong>Header Auth account 2</strong>. The important fields are header Name <code>Authorization</code> and the valid <code>Bearer …</code> value. Never use that CRM credential as a Gemini API key.</p></div>
+<p class="small">“Shared configuration: Read by n8n” proves a read occurred, not that every branch uses every preference. The <a href="http://localhost:3001/integrations/connection-guide.md">detailed connection guide</a> lists the required gate conditions.</p>
+</section>
+
+<section class="page">
+<p class="eyebrow">13 · Final checks and references</p><h2>Record your end-to-end result</h2>
+<table><thead><tr><th>Done</th><th>Checkpoint</th><th>Your evidence</th></tr></thead><tbody>
+<tr><td><span class="check"></span></td><td>Header rows preserved</td><td>Leads + ReplyReviews headers verified</td></tr>
+<tr><td><span class="check"></span></td><td>AI + automatic email flags true</td><td>Original config and actual AI/Gmail execution results</td></tr>
+<tr><td><span class="check"></span></td><td>New form lead captured</td><td>Matching fresh Lead_ID in Sheet and dashboard</td></tr>
+<tr><td><span class="check"></span></td><td>Acknowledgement + owner alert</td><td>Messages received at controlled addresses; statuses saved</td></tr>
+<tr><td><span class="check"></span></td><td>Dashboard edit synced</td><td>Notes updated on the same row; Applied shown</td></tr>
+<tr><td><span class="check"></span></td><td>Manual reply sent once</td><td>Sent result + Gmail Sent + received message</td></tr>
+<tr><td><span class="check"></span></td><td>Gmail inquiry and reply captured</td><td>Original email in Inbox; proposed reply in AI Drafts</td></tr>
+<tr><td><span class="check"></span></td><td>Consented follow-up verified</td><td>Sent timestamp; no second send on next eligibility scan</td></tr>
+<tr><td><span class="check"></span></td><td>Exactly two intended workflows enabled</td><td>Original main + combined bridge; older copies inactive</td></tr>
+</tbody></table>
+<p>After the checks pass, save/publish the main automation and combined bridge. Use the original form’s <strong>Production URL</strong>. Keep Docker/n8n and the CRM server running. The browser may close; the CRM server still needs to run for events and bridge requests.</p>
+<h3>Files provided with this guide</h3>
+<ul><li><a href="http://localhost:3001/integrations/customerlead-sync-and-send-bridge.json">Combined sync-and-send bridge JSON</a> — replacement workflow 2.</li><li><a href="http://localhost:3001/integrations/customerlead-email-nodes.json">Two email inquiry event nodes</a> — copy into workflow 1.</li><li><a href="http://localhost:3001/integrations/customerlead-event-adapters.json">Full event adapter kit</a> — initial email results and follow-up events.</li><li><a href="http://localhost:3001/integrations/connection-guide.md">Detailed integration reference</a> — contracts, configuration gates and recovery.</li></ul>
+<h3>Official documentation</h3>
+<p class="small"><a href="https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.formtrigger/">n8n Form Trigger: test and production URLs</a><br><a href="https://docs.n8n.io/build/understand-workflows/understand-executions/types-of-executions.md">n8n manual, partial and production executions</a><br><a href="https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.drafts/send">Gmail users.drafts.send</a><br><a href="https://docs.docker.com/desktop/features/networking/">Docker Desktop container-to-host networking</a></p>
+<div class="box pass"><p><strong>What is verified versus still to test:</strong> the CRM’s isolated automated/browser tests exercise simulated Gmail callbacks, not live delivery. This guide prepares your real integration test; the successful live outcomes should be checked and recorded by you using your controlled inboxes.</p></div>
+</section>
+
+</body></html>

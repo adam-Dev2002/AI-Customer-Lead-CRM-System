@@ -1,0 +1,1125 @@
+{
+  "name": "CustomerLead — Sheets write-back & Gmail draft review bridge",
+  "nodes": [
+    {
+      "id": "e6a85d25-9d75-4f42-b508-fa812199e381",
+      "name": "Setup notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "parameters": {
+        "content": "# CustomerLead sync bridge\nInactive until you configure it. Set the spreadsheet ID below. Prepare Leads + ReplyReviews headers using the connection guide. Select CRM Header Auth and Google credentials. Run ONE bridge execution at a time.\n\nThis workflow writes Sheets and updates existing plain-text Gmail drafts. It has NO email send operation. Manual CRM drafts are recorded in ReplyReviews for review in Gmail. Import the event adapters into the original automation separately.",
+        "height": 300,
+        "width": 560
+      },
+      "position": [
+        -300,
+        -420
+      ]
+    },
+    {
+      "id": "5ccdb417-74cd-4f05-95ab-7be07ed6d505",
+      "name": "Manual connection test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        -280,
+        0
+      ]
+    },
+    {
+      "id": "d5ed8d02-52e2-4796-9e01-c69fd10e9745",
+      "name": "Poll every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "position": [
+        -280,
+        180
+      ]
+    },
+    {
+      "id": "36bb8bb9-2300-43fd-ba1e-aec7fa4d0ad0",
+      "name": "Bridge settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "eaffc648-6eed-4c47-886f-9b705c67c8a5",
+              "name": "crmBaseUrl",
+              "value": "http://host.docker.internal:3001",
+              "type": "string"
+            },
+            {
+              "id": "8069dbe3-212a-4cf5-ab5a-94c128da6581",
+              "name": "spreadsheetId",
+              "value": "REPLACE_WITH_EXISTING_SPREADSHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "f3729a0a-479a-47eb-8544-79cb4638ebd8",
+              "name": "leadTab",
+              "value": "Leads",
+              "type": "string"
+            },
+            {
+              "id": "9d526433-46e7-4550-bbfe-00d76138cc8d",
+              "name": "reviewTab",
+              "value": "ReplyReviews",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "position": [
+        -40,
+        40
+      ]
+    },
+    {
+      "id": "c8920ffb-f258-491d-9b67-2f255ad7cc95",
+      "name": "Read owner changes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Bridge settings').first().json.crmBaseUrl + '/api/n8n/sync' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        180,
+        40
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "ddbd09c5-175f-4c04-98a8-029df23e9387",
+      "name": "Each change",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return ($input.first().json.changes || []).map(c => ({json:c}));"
+      },
+      "position": [
+        400,
+        40
+      ]
+    },
+    {
+      "id": "86131fcb-9fef-43df-b592-10f4ccf51861",
+      "name": "Loop changes",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "position": [
+        620,
+        40
+      ]
+    },
+    {
+      "id": "496d310f-9ba2-4f9c-9ae0-375668f2b837",
+      "name": "Lead change?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8c344939-22b9-4759-9a09-faed58e11caf",
+              "leftValue": "={{ $json.kind !== 'draft.review' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        840,
+        100
+      ]
+    },
+    {
+      "id": "c5064da6-6edc-4e9b-aab1-40ca7dff0edf",
+      "name": "Read existing lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Bridge settings').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Bridge settings').first().json.leadTab }}",
+          "mode": "name"
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Lead_ID",
+              "lookupValue": "={{ $json.payload.Lead_ID }}"
+            }
+          ]
+        }
+      },
+      "position": [
+        1060,
+        -100
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "4441ce47-12f8-473d-948f-2106b31dd7a7",
+      "name": "Merge owner fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst change = $('Loop changes').item.json;\nconst rows = $input.all().map(i => i.json);\nconst failure = rows.find(r => r.error);\nif (failure) return [{json:{_syncError:'Could not read the existing Sheets record.'}}];\nconst matches = rows.filter(r => r.Lead_ID);\nif (matches.length > 1) return [{json:{_syncError:'Duplicate Lead_ID rows found. Resolve them in Sheets before retrying.'}}];\nconst old = matches[0];\nconst p = change.payload;\nconst fields = change.fields || Object.keys(p);\nconst locked = old && ['Reserved','Sent'].includes(old.Follow_Up_State);\nif (locked && String(change.intent).startsWith('followup.'))\n  return [{json:{_syncError:'The follow-up is already reserved or sent. Check its execution before changing its schedule.'}}];\nconst row = old ? {...old} : {...p};\nfor (const field of fields) if (Object.hasOwn(p, field)) row[field] = p[field];\nrow.Lead_ID = p.Lead_ID;\n// n8n owns delivery outcomes; an owner edit must not undo a reservation/send.\nif (locked) row.Follow_Up_State = old.Follow_Up_State;\ndelete row.row_number;\nreturn [{json:row}];\n"
+      },
+      "position": [
+        1280,
+        -100
+      ]
+    },
+    {
+      "id": "e59e1eaa-1d05-4b1f-8078-923958d5471a",
+      "name": "Lead row valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5a6682b2-36d6-4de0-928b-855d15e9ff71",
+              "leftValue": "={{ !$json._syncError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        1500,
+        -100
+      ]
+    },
+    {
+      "id": "2b84a1c3-f0cf-4490-9259-94423df2e891",
+      "name": "Save shared lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Bridge settings').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Bridge settings').first().json.leadTab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "Lead_ID"
+          ],
+          "schema": [
+            {
+              "id": "Lead_ID",
+              "displayName": "Lead_ID",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Created_At_UTC",
+              "displayName": "Created_At_UTC",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Service",
+              "displayName": "Service",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Consent",
+              "displayName": "Consent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Priority",
+              "displayName": "Priority",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Follow_Up_Due_UTC",
+              "displayName": "Follow_Up_Due_UTC",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Follow_Up_State",
+              "displayName": "Follow_Up_State",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Follow_Up_Sent_UTC",
+              "displayName": "Follow_Up_Sent_UTC",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Owner",
+              "displayName": "Owner",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Acknowledgement_Status",
+              "displayName": "Acknowledgement_Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Owner_Alert_Status",
+              "displayName": "Owner_Alert_Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "AI_Summary",
+              "displayName": "AI_Summary",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Gmail_Thread_ID",
+              "displayName": "Gmail_Thread_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "position": [
+        1720,
+        -180
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "25db8c62-4bb4-41fd-8b0b-66da90ef902c",
+      "name": "Lead acknowledgement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const c = $('Loop changes').item.json; return {json:{changeId:c.id,status:$json.error ? 'Failed' : 'Applied',detail:$json.error ? 'Sheets update failed. Check the credential, headers, and spreadsheet.' : 'Shared lead row updated in Sheets.',executionId:$execution.id}};"
+      },
+      "position": [
+        1940,
+        -180
+      ]
+    },
+    {
+      "id": "51cbc284-542b-45f8-8302-d3bbfa7b5772",
+      "name": "Guard acknowledgement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const c = $('Loop changes').item.json; return {json:{changeId:c.id,status:'Failed',detail:$json._syncError || 'Update needs review.',executionId:$execution.id}};"
+      },
+      "position": [
+        1940,
+        0
+      ]
+    },
+    {
+      "id": "8448dd2e-be88-4d2a-a40a-a81c8c911f81",
+      "name": "Prepare review row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const p=$json.payload; return {json:{...p,Updated_At_UTC:new Date().toISOString()}};"
+      },
+      "position": [
+        1060,
+        300
+      ]
+    },
+    {
+      "id": "bf7ff631-5386-49c9-8593-66b5ba463576",
+      "name": "Save reply review",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Bridge settings').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Bridge settings').first().json.reviewTab }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "Draft_ID"
+          ],
+          "schema": [
+            {
+              "id": "Draft_ID",
+              "displayName": "Draft_ID",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Lead_ID",
+              "displayName": "Lead_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Gmail_Draft_ID",
+              "displayName": "Gmail_Draft_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Gmail_Thread_ID",
+              "displayName": "Gmail_Thread_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Subject",
+              "displayName": "Subject",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Body",
+              "displayName": "Body",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Review_Status",
+              "displayName": "Review_Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Updated_At_UTC",
+              "displayName": "Updated_At_UTC",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "ignoreIt"
+        }
+      },
+      "position": [
+        1280,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "58711954-80d9-49d7-b1df-9e6f08b206d8",
+      "name": "Update existing Gmail draft?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e07bf942-77ad-4b12-a694-be8f76d8f824",
+              "leftValue": "={{ !$json.error && $('Loop changes').item.json.intent !== 'mirror.capture' && !!$('Loop changes').item.json.payload.Gmail_Draft_ID && $('Loop changes').item.json.payload.Review_Status !== 'Rejected' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        1500,
+        300
+      ]
+    },
+    {
+      "id": "6bb5a321-cf6a-4411-a8cc-26218b9046ea",
+      "name": "Read Gmail draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + encodeURIComponent($('Loop changes').item.json.payload.Gmail_Draft_ID) + '?format=full' }}",
+        "authentication": "predefinedCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        },
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "position": [
+        1720,
+        220
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Select your Gmail OAuth2 credential. Reads the existing draft to protect attachments, copied recipients, and thread identity."
+    },
+    {
+      "id": "6ebc2e2a-7a19-4d5e-b34c-1a95fe61530f",
+      "name": "Prepare Gmail update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst change = $('Loop changes').item.json, p = change.payload, current = $json;\nconst fail = detail => ({json:{_syncError:detail}});\nif (current.error) return fail('Could not read the Gmail draft. It may have been sent or deleted, or belong to another account. Check Gmail before retrying.');\nif (String(current.id || '') !== String(p.Gmail_Draft_ID)) return fail('Gmail returned a different draft. Review the linked draft in Gmail.');\nconst headers = current.message?.payload?.headers || [];\nconst header = name => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';\nconst to = header('To').trim();\nconst addresses = [...to.matchAll(/[A-Z0-9.!#$%&'*+/=?^_{}|~-]+@[A-Z0-9.-]+/gi)].map(m => m[0].toLowerCase());\nif (to && (addresses.length !== 1 || addresses[0] !== String(p.Email).toLowerCase())) return fail('Draft recipient differs from this inquiry. Review it in Gmail.');\nif (header('Cc') || header('Bcc')) return fail('This draft has copied recipients. Edit it in Gmail to preserve them.');\nconst attachment = part => !!part && (!!part.filename || !!part.body?.attachmentId || (part.parts || []).some(attachment));\nif (attachment(current.message?.payload)) return fail('This draft has attachments. Edit it in Gmail to preserve them.');\nif (p.Gmail_Thread_ID && current.message?.threadId !== p.Gmail_Thread_ID) return fail('Draft thread does not match this inquiry. Review it in Gmail.');\nconst subject = Buffer.from(String(p.Subject).replace(/[\\r\\n]/g,' '),'utf8').toString('base64');\nconst message = ['To: ' + p.Email, 'Subject: =?UTF-8?B?' + subject + '?=', 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', Buffer.from(String(p.Body),'utf8').toString('base64').match(/.{1,76}/g).join('\\r\\n')].join('\\r\\n');\nconst result = {id:p.Gmail_Draft_ID, message:{raw:Buffer.from(message,'utf8').toString('base64url')}};\nif (current.message?.threadId) result.message.threadId = current.message.threadId;\nreturn {json:{gmailBody:result}};\n"
+      },
+      "position": [
+        1940,
+        220
+      ]
+    },
+    {
+      "id": "f5736c8c-d589-483e-984c-430b675b7006",
+      "name": "Gmail update valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a059974e-8882-4211-88d6-5347083188af",
+              "leftValue": "={{ !$json._syncError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        2160,
+        220
+      ]
+    },
+    {
+      "id": "72086a80-6adb-40a4-a1ef-5accfb2531d8",
+      "name": "Update Gmail draft — never send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + encodeURIComponent($('Loop changes').item.json.payload.Gmail_Draft_ID) }}",
+        "authentication": "predefinedCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.gmailBody }}",
+        "options": {
+          "timeout": 15000
+        },
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "position": [
+        2380,
+        160
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Updates an existing draft only. There is no send operation."
+    },
+    {
+      "id": "dea993cf-7fe1-4d07-9b05-dafa2296dee5",
+      "name": "Gmail acknowledgement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const c=$('Loop changes').item.json; return {json:{changeId:c.id,status:$json.error ? 'Failed':'Applied',detail:$json.error ? 'Review saved in Sheets, but Gmail draft update failed.' : 'Review saved in Sheets and the existing Gmail draft updated. No email sent.',executionId:$execution.id}};"
+      },
+      "position": [
+        2600,
+        160
+      ]
+    },
+    {
+      "id": "d5c79078-30fa-4683-91b6-821e93170a5a",
+      "name": "Review acknowledgement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const c=$('Loop changes').item.json; return {json:{changeId:c.id,status:$json.error ? 'Failed':'Applied',detail:$json.error ? 'Could not save the reply review to Sheets.' : c.intent === 'mirror.capture' ? 'Incoming reply draft recorded in ReplyReviews. Existing Gmail draft kept unchanged.' : c.payload.Review_Status === 'Rejected' ? 'Rejection recorded in ReplyReviews. Existing Gmail draft kept for owner review.' : 'Review recorded in ReplyReviews. Sending requires approval and explicit confirmation in the dashboard.',executionId:$execution.id}};"
+      },
+      "position": [
+        1720,
+        480
+      ]
+    },
+    {
+      "id": "58267329-f30e-4a81-814f-ae18f4363335",
+      "name": "Confirm external result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Bridge settings').first().json.crmBaseUrl + '/api/n8n/sync' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        2820,
+        20
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    }
+  ],
+  "connections": {
+    "Manual connection test": {
+      "main": [
+        [
+          {
+            "node": "Bridge settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll every minute": {
+      "main": [
+        [
+          {
+            "node": "Bridge settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bridge settings": {
+      "main": [
+        [
+          {
+            "node": "Read owner changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read owner changes": {
+      "main": [
+        [
+          {
+            "node": "Each change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Each change": {
+      "main": [
+        [
+          {
+            "node": "Loop changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop changes": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Lead change?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead change?": {
+      "main": [
+        [
+          {
+            "node": "Read existing lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare review row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read existing lead": {
+      "main": [
+        [
+          {
+            "node": "Merge owner fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge owner fields": {
+      "main": [
+        [
+          {
+            "node": "Lead row valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead row valid?": {
+      "main": [
+        [
+          {
+            "node": "Save shared lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guard acknowledgement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save shared lead": {
+      "main": [
+        [
+          {
+            "node": "Lead acknowledgement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead acknowledgement": {
+      "main": [
+        [
+          {
+            "node": "Confirm external result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard acknowledgement": {
+      "main": [
+        [
+          {
+            "node": "Confirm external result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare review row": {
+      "main": [
+        [
+          {
+            "node": "Save reply review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save reply review": {
+      "main": [
+        [
+          {
+            "node": "Update existing Gmail draft?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update existing Gmail draft?": {
+      "main": [
+        [
+          {
+            "node": "Read Gmail draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Review acknowledgement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review acknowledgement": {
+      "main": [
+        [
+          {
+            "node": "Confirm external result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Gmail draft": {
+      "main": [
+        [
+          {
+            "node": "Prepare Gmail update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Gmail update": {
+      "main": [
+        [
+          {
+            "node": "Gmail update valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail update valid?": {
+      "main": [
+        [
+          {
+            "node": "Update Gmail draft — never send",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guard acknowledgement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Gmail draft — never send": {
+      "main": [
+        [
+          {
+            "node": "Gmail acknowledgement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail acknowledgement": {
+      "main": [
+        [
+          {
+            "node": "Confirm external result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm external result": {
+      "main": [
+        [
+          {
+            "node": "Loop changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

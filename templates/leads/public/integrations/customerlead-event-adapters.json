@@ -1,0 +1,532 @@
+{
+  "name": "CustomerLead — copy event adapters into your existing workflow",
+  "nodes": [
+    {
+      "id": "8f2b001d-37f4-4965-ae94-eda9933932fb",
+      "name": "Adapter setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "parameters": {
+        "content": "# Copy these adapters into the original workflow\nEach pair is a Code adapter + authenticated HTTP event publisher. Source node names are matched to your supplied export. Follow the connection guide for exact attachment points.\n\nThe shared URL uses Docker Desktop host.docker.internal:3001. Select the CustomerLead Header Auth credential on every HTTP node. No Gmail, Sheets, or AI credential is included. These adapters publish saved outcomes and never send customer email.",
+        "width": 640,
+        "height": 260
+      },
+      "position": [
+        -350,
+        -340
+      ]
+    },
+    {
+      "id": "808859b6-0db8-43f4-8218-bc341101f34d",
+      "name": "Form captured",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst p = {...$json};\nif (!p.Lead_ID) throw new Error('Connect this adapter after SHEETS — Append Customer Lead.');\nconst classification = String(p.Notes || '').match(/^AI category:\\s*(Sales|Quote|Booking|General)\\.\\s*(.+)$/s);\nif (classification) { p.Category ||= classification[1]; p.AI_Summary ||= classification[2]; }\nreturn {json:{eventId:$execution.id + ':form:' + p.Lead_ID,type:'lead.upsert',data:{...p,Create_Only:true}}};\n"
+      },
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "50a6d589-b1ea-4cde-bb70-91449fb39d3b",
+      "name": "Publish Form captured",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        300,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "1b4ca81c-7c94-4eca-b74e-222c24643e2a",
+      "name": "Initial email results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst base = $('SHEETS — Append Customer Lead').item.json;\nconst p = {...base,...$json,Lead_ID:base.Lead_ID};\nconst classification = String(p.Notes || '').match(/^AI category:\\s*(Sales|Quote|Booking|General)\\.\\s*(.+)$/s);\nif (classification) { p.Category ||= classification[1]; p.AI_Summary ||= classification[2]; }\nreturn {json:{eventId:$execution.id + ':initial-results:' + base.Lead_ID,type:'lead.delivery',data:p}};\n"
+      },
+      "position": [
+        0,
+        240
+      ]
+    },
+    {
+      "id": "f8fc7612-af83-45ce-8e30-e77ce3c0544b",
+      "name": "Publish Initial email results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        300,
+        240
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "41b277bb-441f-4566-b1a6-9d785600f6ae",
+      "name": "Email support processed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst p = $('Review AI & Route').item.json, result = $json;\nconst leadId = 'GMAIL-' + p.message_id;\nconst name = String(p.from || '').replace(/^from:\\s*/i,'').replace(/<[^>]*>/g,'').replace(/\"/g,'').trim() || String(p.sender).split('@')[0] || 'Email customer';\nconst data = {Lead_ID:leadId,Name:name.length > 1 ? name : 'Email customer',Email:p.sender,Phone:'',Service:String(p.subject || 'Customer email inquiry').slice(0,120),Message:p.body,Source:'Gmail',Consent:'No',Status:'New',Priority:p.priority || 'Normal',Category:p.category || 'General',AI_Summary:p.summary || '',Notes:p.reason || '',Created_At_UTC:new Date().toISOString(),Follow_Up_State:'Skipped',Follow_Up_Due_UTC:'',Gmail_Thread_ID:p.thread_id,Title:'Email support processed',Detail:p.reason || p.ai_error || '',Stage:'support',Execution_ID:$execution.id,Workflow:$workflow.name};\nif (p.create_draft && result.id && !result.error) Object.assign(data,{Draft_ID:'GMAIL-DRAFT-' + result.id,Gmail_Draft_ID:result.id,Subject:/^re:/i.test(p.subject || '') ? p.subject : 'Re: ' + (p.subject || 'Your inquiry'),Body:p.reply_body,Provider:p.ai_provider || 'Gemini',Review_Reason:p.reason || 'Owner review required'});\ndata.Status = 'New';\ndata.Run_Status = result.error || !p.valid ? 'failed' : p.outcome === 'skipped' ? 'skipped' : 'success';\nreturn {json:{eventId:$execution.id + ':support:' + p.message_id,type:'support.processed',data}};\n"
+      },
+      "position": [
+        0,
+        480
+      ]
+    },
+    {
+      "id": "fd1be14d-8de7-442c-b298-1b8f1e3e0a6c",
+      "name": "Publish Email support processed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        300,
+        480
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "47bc816b-3bf8-438a-b151-8e99baa49803",
+      "name": "Follow-up reserved",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst p = $('FILTER — Pending Consented Follow-Ups').item.json;\nif ($json.error) throw new Error('Reservation failed; do not report it as reserved.');\nreturn {json:{eventId:$execution.id + ':reserved:' + p.Lead_ID,type:'followup.updated',data:{Lead_ID:p.Lead_ID,Follow_Up_State:'Reserved',Run_Status:'running',Stage:'follow-up reservation',Execution_ID:$execution.id,Title:'Follow-up reserved'}}};\n"
+      },
+      "position": [
+        0,
+        720
+      ]
+    },
+    {
+      "id": "7f3b1545-d1bc-4dfd-bdef-ac10827ca178",
+      "name": "Publish Follow-up reserved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        300,
+        720
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "b748026b-88c9-425f-b7da-f22c518615f0",
+      "name": "Follow-up outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst p = $json;\nif (!p.Lead_ID || !p.Follow_Up_State) throw new Error('Connect after SHEETS — Log Follow-Up Outcome and retain its saved fields.');\nreturn {json:{eventId:$execution.id + ':followup:' + p.Lead_ID,type:'followup.updated',data:{...p,Run_Status:p.Follow_Up_State === 'Needs Review' ? 'failed' : 'success',Execution_ID:$execution.id,Stage:'follow-up result',Title:'Follow-up ' + p.Follow_Up_State}}};\n"
+      },
+      "position": [
+        0,
+        960
+      ]
+    },
+    {
+      "id": "b3bef47c-7aeb-48bb-9425-9bca685eeeab",
+      "name": "Publish Follow-up outcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        300,
+        960
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "3b049773-c7bd-4774-932f-5a566adbbfb7",
+      "name": "Email screening result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst p = $('Prepare Email + Safety Screen').item.json;\nreturn {json:{eventId:$execution.id + ':screened:' + p.message_id,type:'automation.run',data:{Title:'Email screened out',Detail:JSON.stringify(p.eligibility_debug || {}),Status:'skipped',Stage:'email screening',Execution_ID:$execution.id,Workflow:$workflow.name}}};\n"
+      },
+      "position": [
+        0,
+        1200
+      ]
+    },
+    {
+      "id": "a6efd752-cd63-40fa-b095-f0f596f8bcfb",
+      "name": "Publish Email screening result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        300,
+        1200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "a110451a-8788-48b7-b29d-a2462666ea52",
+      "name": "Form rejected or duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nreturn {json:{eventId:$execution.id + ':form-rejected',type:'automation.run',data:{Title:'Form inquiry not captured',Detail:String($json.error || 'Duplicate inquiry suppressed within 15 minutes.'),Status:'skipped',Stage:'validation / deduplication',Execution_ID:$execution.id,Workflow:$workflow.name}}};\n"
+      },
+      "position": [
+        0,
+        1440
+      ]
+    },
+    {
+      "id": "c57fcc31-b239-40b7-a3c3-effaba05fcb1",
+      "name": "Publish Form rejected or duplicate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        300,
+        1440
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "ed25db97-f526-4b73-bd23-7ae79d251b69",
+      "name": "Read shared CRM configuration",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "GET",
+        "url": "http://host.docker.internal:3001/api/n8n/config",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        0,
+        1800
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "eab525c5-88bd-49f2-a0ef-fcc8d63833eb",
+      "name": "Authenticated CRM health check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "GET",
+        "url": "http://host.docker.internal:3001/api/n8n/health",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        300,
+        1800
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "31851d61-4ff8-44c8-9fb9-88e782dc5c0c",
+      "name": "Keep inquiry context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all();"
+      },
+      "position": [
+        0,
+        2000
+      ]
+    },
+    {
+      "id": "abc71bd4-7a43-4617-8f3a-73ea27680e58",
+      "name": "Apply lead configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const config = {...$input.first().json.config, sheet_id:'REPLACE_WITH_EXISTING_SPREADSHEET_ID', sheet_tab:'Leads'}; return $('Keep inquiry context').all().map(item => ({json:{...item.json,_cfg:config}}));"
+      },
+      "position": [
+        300,
+        2000
+      ]
+    },
+    {
+      "id": "37f86bbb-aa4c-4752-afa2-541714592f35",
+      "name": "Workflow failure",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        2240
+      ]
+    },
+    {
+      "id": "a7c179cb-5e9a-493e-b688-a9ab58987079",
+      "name": "Execution failure event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst e=$json.execution || {}, w=$json.workflow || {};\nreturn {json:{eventId:'error:' + String(e.id || $execution.id),type:'automation.run',data:{Title:'Automation execution failed',Detail:String(e.error?.message || 'Inspect the failed execution in n8n.').slice(0,1000),Status:'failed',Stage:String(e.lastNodeExecuted || ''),Execution_ID:String(e.id || ''),Workflow:String(w.name || '')}}};\n"
+      },
+      "position": [
+        300,
+        2240
+      ]
+    },
+    {
+      "id": "b088b6f9-4460-4a09-a31c-8e2ed44363e0",
+      "name": "Publish execution failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        600,
+        2240
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    }
+  ],
+  "connections": {
+    "Form captured": {
+      "main": [
+        [
+          {
+            "node": "Publish Form captured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initial email results": {
+      "main": [
+        [
+          {
+            "node": "Publish Initial email results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email support processed": {
+      "main": [
+        [
+          {
+            "node": "Publish Email support processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow-up reserved": {
+      "main": [
+        [
+          {
+            "node": "Publish Follow-up reserved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow-up outcome": {
+      "main": [
+        [
+          {
+            "node": "Publish Follow-up outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email screening result": {
+      "main": [
+        [
+          {
+            "node": "Publish Email screening result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form rejected or duplicate": {
+      "main": [
+        [
+          {
+            "node": "Publish Form rejected or duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow failure": {
+      "main": [
+        [
+          {
+            "node": "Execution failure event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execution failure event": {
+      "main": [
+        [
+          {
+            "node": "Publish execution failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

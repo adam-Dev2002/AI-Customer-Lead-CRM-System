@@ -1,0 +1,72 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# AI Coding Agents
+CLAUDE.md
+.cursorrules
+.claude
+
+# Keep local operational history and the upstream template catalog private.
+/AGENTS.md
+/home/
+/templates-baseui/
+/templates/*
+!/templates/leads/
+
+# dependencies
+**/node_modules
+/.local-tools/
+/.local-preview/
+/private-integrations/
+**/.data/
+**/.next-qa/
+/deploy/customerlead/.env
+/deploy/customerlead/n8n-runtime.env
+/deploy/customerlead/state/
+/deploy/customerlead/backups/
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.env
+!*.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Private exports, temporary archives and editor files
+*.log
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.db
+/.vscode/
+/.idea/

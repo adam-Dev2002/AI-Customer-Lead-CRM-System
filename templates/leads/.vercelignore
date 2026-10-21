@@ -1,0 +1,8 @@
+.data
+.env*
+!.env.example
+.next-qa
+tests
+*.tsbuildinfo
+*.log
+public/integrations

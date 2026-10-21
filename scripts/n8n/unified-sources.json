@@ -1,0 +1,27 @@
+{
+  "reviewedOn": "2026-10-20",
+  "liveReviewedOn": "2026-10-20",
+  "sources": [
+    {
+      "role": "main",
+      "path": "C:/Users/adamr/Downloads/AI CUSTOMER SUPPORT + LEAD CAPTURE CRM _ Gmail Drafts + Gemini + Follow-up _ ONE WORKFLOW.json",
+      "nodeCount": 97,
+      "sha256": "aeffc0985076ce0be04d07816debefa4db94e634f92397cc7cbb4320098fbb97",
+      "liveSavedGraphSha256": "acb8d60493fc374628117906e63f99186401e3af3346b7f63a35baae895e805a"
+    },
+    {
+      "role": "sync",
+      "path": "C:/Users/adamr/Downloads/CustomerLead — Sheets write-back & Gmail draft review bridge(part of AI-CUSTOMER-LEAD PROJECT workflow 3).json",
+      "nodeCount": 24,
+      "sha256": "64cafb5497d85840d9dce6a0cd91a9e54d1c74be82e0a06ff0ba5744dab393f9",
+      "liveSavedGraphSha256": "43c8f603588d82ce0ef93968e0a188e86aca1b300b663b48f051a07cf081ff86"
+    },
+    {
+      "role": "sender",
+      "path": "C:/Users/adamr/Downloads/CustomerLead — owner-confirmed Gmail sender(part of AI-CUSTOMER-LEAD PROJECT workflow 2).json",
+      "nodeCount": 16,
+      "sha256": "79d6d9a0eadecec15a45bb7c98c741473d7fada1b6c02f2d913b27ab1e43ffc2",
+      "liveSavedGraphSha256": "79a662bfcf37d0b6a777a8a47faee32b0a657481b750497666b35460b4f082dc"
+    }
+  ]
+}

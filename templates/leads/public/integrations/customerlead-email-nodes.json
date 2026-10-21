@@ -1,0 +1,64 @@
+{
+  "name": "CustomerLead — Gmail inquiry and draft to CRM (2 nodes)",
+  "nodes": [
+    {
+      "id": "41b277bb-441f-4566-b1a6-9d785600f6ae",
+      "name": "Email support processed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst p = $('Review AI & Route').item.json, result = $json;\nconst leadId = 'GMAIL-' + p.message_id;\nconst name = String(p.from || '').replace(/^from:\\s*/i,'').replace(/<[^>]*>/g,'').replace(/\"/g,'').trim() || String(p.sender).split('@')[0] || 'Email customer';\nconst data = {Lead_ID:leadId,Name:name.length > 1 ? name : 'Email customer',Email:p.sender,Phone:'',Service:String(p.subject || 'Customer email inquiry').slice(0,120),Message:p.body,Source:'Gmail',Consent:'No',Status:'New',Priority:p.priority || 'Normal',Category:p.category || 'General',AI_Summary:p.summary || '',Notes:p.reason || '',Created_At_UTC:new Date().toISOString(),Follow_Up_State:'Skipped',Follow_Up_Due_UTC:'',Gmail_Thread_ID:p.thread_id,Title:'Email support processed',Detail:p.reason || p.ai_error || '',Stage:'support',Execution_ID:$execution.id,Workflow:$workflow.name};\nif (p.create_draft && result.id && !result.error) Object.assign(data,{Draft_ID:'GMAIL-DRAFT-' + result.id,Gmail_Draft_ID:result.id,Subject:/^re:/i.test(p.subject || '') ? p.subject : 'Re: ' + (p.subject || 'Your inquiry'),Body:p.reply_body,Provider:p.ai_provider || 'Gemini',Review_Reason:p.reason || 'Owner review required'});\ndata.Status = 'New';\ndata.Run_Status = result.error || !p.valid ? 'failed' : p.outcome === 'skipped' ? 'skipped' : 'success';\nreturn {json:{eventId:$execution.id + ':support:' + p.message_id,type:'support.processed',data}};\n"
+      },
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "fd1be14d-8de7-442c-b298-1b8f1e3e0a6c",
+      "name": "Publish Email support processed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        320,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    }
+  ],
+  "connections": {
+    "Email support processed": {
+      "main": [
+        [
+          {
+            "node": "Publish Email support processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

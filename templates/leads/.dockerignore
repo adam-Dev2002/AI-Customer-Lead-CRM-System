@@ -1,0 +1,13 @@
+node_modules
+.next
+.next-qa
+.data
+.env*
+!.env.example
+.git
+coverage
+tests
+*.tsbuildinfo
+*.log
+next-env.d.ts
+public/integrations

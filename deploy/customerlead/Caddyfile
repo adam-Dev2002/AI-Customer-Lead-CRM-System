@@ -1,0 +1,15 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$CRM_HOST} {
+	encode zstd gzip
+	# Maintainer integration exports are not part of the customer website.
+	respond /integrations/* 404
+	reverse_proxy crm:3001
+}
+
+{$N8N_HOST} {
+	encode zstd gzip
+	reverse_proxy n8n:5678
+}

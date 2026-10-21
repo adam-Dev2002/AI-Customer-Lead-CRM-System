@@ -1,0 +1,70 @@
+name: customerlead
+services:
+  crm:
+    build:
+      context: ../../templates/leads
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?Set the existing Supabase public URL}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:?Set the existing public publishable key}
+    restart: unless-stopped
+    init: true
+    shm_size: 256mb
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:?Restore the existing CRM integration secret}
+      CRM_CUSTOMER_FORM_URL: https://${N8N_HOST:?Set the automation hostname}/form/${CRM_FORM_ID:?Set the existing form ID}
+    volumes:
+      - ./state/crm:/data/crm
+    ports:
+      - 127.0.0.1:3001:3001
+    networks:
+      default:
+        aliases:
+          # Existing workflow receiver URLs remain valid on this private network.
+          - host.docker.internal
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.43.8
+    restart: unless-stopped
+    entrypoint: [tini, --, /bin/sh, /launch-n8n.sh]
+    env_file:
+      - n8n-runtime.env
+    environment:
+      N8N_HOST: ${N8N_HOST}
+      N8N_PROTOCOL: https
+      N8N_PORT: 5678
+      N8N_EDITOR_BASE_URL: https://${N8N_HOST}/
+      N8N_WEBHOOK_URL: https://${N8N_HOST}/
+      N8N_PROXY_HOPS: 1
+      N8N_SECURE_COOKIE: "true"
+      GENERIC_TIMEZONE: Asia/Singapore
+      TZ: Asia/Singapore
+    volumes:
+      - ./state/n8n:/home/node/.n8n
+      - ./launch-n8n.sh:/launch-n8n.sh:ro
+    ports:
+      - 127.0.0.1:5678:5678
+    depends_on:
+      crm:
+        condition: service_healthy
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    profiles: [public]
+    environment:
+      CRM_HOST: ${CRM_HOST:?Set the dashboard hostname}
+      N8N_HOST: ${N8N_HOST}
+      ACME_EMAIL: ${ACME_EMAIL:?Set the certificate contact email}
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      crm:
+        condition: service_healthy
+volumes:
+  caddy_data:
+  caddy_config:

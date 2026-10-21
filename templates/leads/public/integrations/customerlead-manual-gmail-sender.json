@@ -1,0 +1,539 @@
+{
+  "name": "CustomerLead — owner-confirmed Gmail sender",
+  "nodes": [
+    {
+      "id": "4e29213b-7cf4-4e99-b5ed-7f90eff679fd",
+      "name": "Sender setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "parameters": {
+        "content": "# Manual replies from the dashboard\nSelect Header Account 2 (CRM Header Auth) on the three CRM requests, and the SAME Gmail OAuth2 account on the four Gmail requests. Run once with an empty queue to register the sending account. Then enable the schedule.\n\nOnly replies approved and explicitly confirmed in the dashboard can be claimed. Review sync must finish first. One claim per execution. NEVER retry or re-run the Gmail send node: check Gmail when delivery is uncertain. This workflow sends real email.",
+        "width": 640,
+        "height": 320
+      },
+      "position": [
+        -280,
+        -380
+      ]
+    },
+    {
+      "id": "ca0fd02f-cd71-47e5-9bc1-4d4b368d8385",
+      "name": "Test manual sender",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        -280,
+        0
+      ]
+    },
+    {
+      "id": "61116b90-0c0b-4df7-bbee-5ab20483ab9f",
+      "name": "Check queued replies every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "position": [
+        -280,
+        180
+      ]
+    },
+    {
+      "id": "40970307-fc7e-4bd3-ac46-f68be71e4e49",
+      "name": "Read sending Gmail account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "GET",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+        "authentication": "predefinedCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        },
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "position": [
+        0,
+        40
+      ]
+    },
+    {
+      "id": "ae5c83d8-4c19-462e-ba86-1ae36121b79a",
+      "name": "Claim approved reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/mail",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {action:'claim',executionId:$execution.id,senderEmail:$json.emailAddress,capabilities:['lead-reports-v1']} }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        240,
+        40
+      ],
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file.",
+      "retryOnFail": false
+    },
+    {
+      "id": "6edc8d34-5a03-4448-aa01-3031b7f29df0",
+      "name": "Reply waiting?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b90e54cb-4367-4b7b-99df-e7333567d35e",
+              "leftValue": "={{ !!$json.job }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        480,
+        40
+      ]
+    },
+    {
+      "id": "4b65700f-57ad-42c6-9bb9-10090e2ffb36",
+      "name": "Read Gmail reply context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Claim approved reply').first().json.job.gmailDraftId ? 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + encodeURIComponent($('Claim approved reply').first().json.job.gmailDraftId) + '?format=full' : $('Claim approved reply').first().json.job.gmailThreadId ? 'https://gmail.googleapis.com/gmail/v1/users/me/threads/' + encodeURIComponent($('Claim approved reply').first().json.job.gmailThreadId) + '?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To' : 'https://gmail.googleapis.com/gmail/v1/users/me/profile' }}",
+        "authentication": "predefinedCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        },
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "position": [
+        720,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f5f30b2a-6bb2-47d6-886c-4df9b9cc0829",
+      "name": "Build confirmed Gmail draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst job = $('Claim approved reply').first().json.job;\nconst current = $json;\nconst fail = detail => ({json:{_mailError:detail}});\nif (current.error) return fail('Could not read the Gmail reply context. Check the Gmail account and linked draft/thread. No send was attempted.');\nconst profile = $('Read sending Gmail account').first().json;\nif (!profile.emailAddress || profile.emailAddress.toLowerCase() !== job.senderEmail.toLowerCase()) return fail('The sending Gmail account changed. No send was attempted.');\nif (job.kind === 'lead-report') {\n  if (job.gmailDraftId || job.gmailThreadId || typeof job.reportRaw !== 'string' || job.reportRaw.length > 20000000 || !/^[A-Za-z0-9_-]+$/.test(job.reportRaw)) return fail('The report attachments are unavailable. No send was attempted.');\n  const raw = Buffer.from(job.reportRaw, 'base64url').toString('utf8');\n  const envelope = raw.split('\\r\\n\\r\\n')[0];\n  const field = name => envelope.split('\\r\\n').find(line => line.toLowerCase().startsWith(name.toLowerCase() + ':'))?.slice(name.length + 1).trim() || '';\n  if (field('From').toLowerCase() !== profile.emailAddress.toLowerCase() || field('To').toLowerCase() !== job.to.toLowerCase() || field('Cc') || field('Bcc') || !field('Content-Type').startsWith('multipart/mixed;')) return fail('The report recipient or attachments changed. No send was attempted.');\n  return {json:{gmailBody:{message:{raw:job.reportRaw}}}};\n}\nlet headers = [], threadId = '', replyTo = '', references = '';\nconst header = name => headers.find(h => String(h.name).toLowerCase() === name.toLowerCase())?.value || '';\nif (job.gmailDraftId) {\n  if (String(current.id) !== job.gmailDraftId) return fail('Gmail returned a different draft. No send was attempted.');\n  headers = current.message?.payload?.headers || [];\n  const addresses = [...header('To').matchAll(/[A-Z0-9.!#$%&'*+/=?^_\\x60{|}~-]+@[A-Z0-9.-]+/gi)].map(m => m[0].toLowerCase());\n  if (header('To').trim() && (addresses.length !== 1 || addresses[0] !== job.to.toLowerCase())) return fail('The Gmail draft recipient differs from the confirmed recipient. No send was attempted.');\n  if (header('Cc') || header('Bcc')) return fail('This Gmail draft has copied recipients. Review it in Gmail. No send was attempted.');\n  const attachment = part => !!part && (!!part.filename || !!part.body?.attachmentId || (part.parts || []).some(attachment));\n  if (attachment(current.message?.payload)) return fail('This Gmail draft has attachments. Review it in Gmail. No send was attempted.');\n  if (job.gmailThreadId && current.message?.threadId !== job.gmailThreadId) return fail('The Gmail draft belongs to a different thread. No send was attempted.');\n  threadId = current.message?.threadId || '';\n  replyTo = header('In-Reply-To'); references = header('References');\n} else if (job.gmailThreadId) {\n  if (current.id !== job.gmailThreadId || !current.messages?.length) return fail('Could not verify the customer email thread. No send was attempted.');\n  headers = current.messages[current.messages.length - 1].payload?.headers || [];\n  const participants = header('From') + ' ' + header('To');\n  const addresses = [...participants.matchAll(/[A-Z0-9.!#$%&'*+/=?^_\\x60{|}~-]+@[A-Z0-9.-]+/gi)].map(m => m[0].toLowerCase());\n  if (!addresses.includes(job.to.toLowerCase())) return fail('The recipient is not present in the linked thread. No send was attempted.');\n  threadId = current.id; replyTo = header('Message-ID'); references = (header('References') + ' ' + replyTo).trim();\n}\nconst subjectKey = s => String(s).replace(/^(re:\\s*)+/i,'').trim().toLowerCase();\nif (threadId && subjectKey(header('Subject')) !== subjectKey(job.subject)) return fail('Keep the original email subject when replying in its Gmail thread. No send was attempted.');\nconst safeIds = value => (String(value).match(/<[^<>\\s\\r\\n]+>/g) || []).slice(-12).join(' ');\n// RFC 2047 encoded words stay below 75 characters, including multibyte subjects.\nconst words = []; let word = '';\nfor (const character of job.subject) {\n  if (word && Buffer.byteLength(word + character, 'utf8') > 42) { words.push(word); word = ''; }\n  word += character;\n}\nif (word) words.push(word);\nconst encodedSubject = words.map(part => '=?UTF-8?B?' + Buffer.from(part, 'utf8').toString('base64') + '?=').join('\\r\\n ');\nconst lines = [\n  'From: ' + profile.emailAddress,\n  'To: ' + job.to,\n  'Subject: ' + encodedSubject,\n  'Date: ' + new Date(job.createdAt).toUTCString(),\n  'Message-ID: <customerlead.' + job.id.replace(/[^a-zA-Z0-9-]/g,'') + '@customerlead.local>',\n  'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64'\n];\nif (safeIds(replyTo)) lines.push('In-Reply-To: ' + safeIds(replyTo));\nif (safeIds(references)) lines.push('References: ' + safeIds(references));\nlines.push('', Buffer.from(job.body,'utf8').toString('base64').match(/.{1,76}/g).join('\\r\\n'));\nconst message = {raw:Buffer.from(lines.join('\\r\\n'),'utf8').toString('base64url')};\nif (threadId) message.threadId = threadId;\nreturn {json:{gmailBody:{...(job.gmailDraftId ? {id:job.gmailDraftId} : {}),message}}};\n"
+      },
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "id": "be9d5bab-002a-431b-8df6-3e661f8557e1",
+      "name": "Draft ready to save?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b85530cc-4754-4390-86ef-7b8bc95140c4",
+              "leftValue": "={{ !$json._mailError }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "id": "5284e08a-cf55-4bdf-b68e-4dd1317bf5da",
+      "name": "Save confirmed Gmail draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "={{ $('Claim approved reply').first().json.job.gmailDraftId ? 'PUT' : 'POST' }}",
+        "url": "={{ 'https://gmail.googleapis.com/gmail/v1/users/me/drafts' + ($('Claim approved reply').first().json.job.gmailDraftId ? '/' + encodeURIComponent($('Claim approved reply').first().json.job.gmailDraftId) : '') }}",
+        "authentication": "predefinedCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.gmailBody }}",
+        "options": {
+          "timeout": 15000
+        },
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "position": [
+        1440,
+        -80
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "4911e7ac-4936-4d64-8439-ae0fe823eac0",
+      "name": "Draft saved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0b56a349-dd71-4096-b786-03c3f39d478e",
+              "leftValue": "={{ !$json.error && !!$json.id }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        1680,
+        -80
+      ]
+    },
+    {
+      "id": "e515fcc9-7787-4a6d-9728-ffb447f639c7",
+      "name": "Record prepared draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/mail",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {action:'prepared',jobId:$('Claim approved reply').first().json.job.id,executionId:$execution.id,gmailDraftId:$json.id} }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        1920,
+        -160
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    },
+    {
+      "id": "73455e34-d679-46da-b73c-e2fa05138baf",
+      "name": "Send confirmed Gmail draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/drafts/send",
+        "authentication": "predefinedCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {id:$json.gmailDraftId} }}",
+        "options": {
+          "timeout": 15000
+        },
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "position": [
+        2160,
+        -160
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": false,
+      "notes": "SENDS REAL EMAIL. Do not retry this node or restart a failed execution from it. The Gmail draft is consumed on success. Review Gmail Sent when the result is uncertain."
+    },
+    {
+      "id": "84f5209d-e18e-4520-8250-15b6877e16ad",
+      "name": "Gmail delivery result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst job = $('Claim approved reply').first().json.job;\nconst sent = !$json.error && !!$json.id;\nreturn {json:{action:'result',jobId:job.id,executionId:$execution.id,status:sent ? 'Sent' : 'Needs Review',gmailMessageId:sent ? $json.id : '',gmailThreadId:sent ? ($json.threadId || '') : '',detail:sent ? '' : 'Gmail delivery could not be confirmed. Check Sent and Drafts in Gmail before sending again.'}};\n"
+      },
+      "position": [
+        2400,
+        -160
+      ]
+    },
+    {
+      "id": "aa75c562-c37f-4fb8-b900-37051cd01900",
+      "name": "Preparation needs review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst job = $('Claim approved reply').first().json.job;\nreturn {json:{action:'result',jobId:job.id,executionId:$execution.id,status:'Needs Review',detail:$json._mailError || 'Could not prepare the Gmail draft. No send was attempted. Check the Gmail credential and draft.'}};\n"
+      },
+      "position": [
+        1920,
+        140
+      ]
+    },
+    {
+      "id": "d399d513-37e2-409b-ba92-c9182043bffd",
+      "name": "Confirm Gmail delivery",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3001/api/n8n/mail",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "position": [
+        2640,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "notes": "Select the CustomerLead HTTP Header Auth credential: Authorization = Bearer <private token>. No token is included in this file."
+    }
+  ],
+  "connections": {
+    "Test manual sender": {
+      "main": [
+        [
+          {
+            "node": "Read sending Gmail account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check queued replies every minute": {
+      "main": [
+        [
+          {
+            "node": "Read sending Gmail account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read sending Gmail account": {
+      "main": [
+        [
+          {
+            "node": "Claim approved reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim approved reply": {
+      "main": [
+        [
+          {
+            "node": "Reply waiting?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply waiting?": {
+      "main": [
+        [
+          {
+            "node": "Read Gmail reply context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Gmail reply context": {
+      "main": [
+        [
+          {
+            "node": "Build confirmed Gmail draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build confirmed Gmail draft": {
+      "main": [
+        [
+          {
+            "node": "Draft ready to save?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft ready to save?": {
+      "main": [
+        [
+          {
+            "node": "Save confirmed Gmail draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparation needs review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save confirmed Gmail draft": {
+      "main": [
+        [
+          {
+            "node": "Draft saved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft saved?": {
+      "main": [
+        [
+          {
+            "node": "Record prepared draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparation needs review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record prepared draft": {
+      "main": [
+        [
+          {
+            "node": "Send confirmed Gmail draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send confirmed Gmail draft": {
+      "main": [
+        [
+          {
+            "node": "Gmail delivery result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail delivery result": {
+      "main": [
+        [
+          {
+            "node": "Confirm Gmail delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparation needs review": {
+      "main": [
+        [
+          {
+            "node": "Confirm Gmail delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

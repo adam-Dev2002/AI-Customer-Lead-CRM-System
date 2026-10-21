@@ -1,0 +1,19 @@
+{
+  "fileName": "AI CUSTOMER SUPPORT + LEAD CAPTURE CRM _ Gmail Drafts + Gemini + Follow-up _ ONE WORKFLOW.json",
+  "sha256": "bf1757ace1e2b99a61dd0c3457ab0999a78e4a149e7f8ec01f71b699fa3c82fd",
+  "reviewedOn": "2026-10-19",
+  "sourceModifiedUtc": "2026-10-19T08:54:55.954Z",
+  "nodeCount": 68,
+  "activeInExport": false,
+  "adapterSourcesChecked": 17,
+  "missingFallbacks": [
+    {
+      "from": "IF — Primary Gemini?",
+      "to": "AI — OpenAI Primary"
+    },
+    {
+      "from": "IF — Gemini Valid?",
+      "to": "AI — OpenAI Backup"
+    }
+  ]
+}

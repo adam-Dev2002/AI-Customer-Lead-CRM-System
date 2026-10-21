@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { getDocument } from '../.local-tools/pdf-review/node_modules/pdfjs-dist/legacy/build/pdf.mjs';
+import canvasPackage from '../.local-tools/pdf-review/node_modules/@napi-rs/canvas/index.js';
+const {createCanvas,loadImage}=canvasPackage;
+const root=fileURLToPath(new URL('../',import.meta.url));
+const output=path.join(root,'.local-preview/project-guide');
+await mkdir(output,{recursive:true});
+const source=await readFile(path.join(root,'docs/customerlead-project-guide.html'),'utf8');
+const markers=[...source.matchAll(/<p class="eyebrow">([^<]+)<\/p>/g)].map(m=>m[1].toLowerCase().replace(/[^a-z0-9]/g,''));
+const pdf=await getDocument({data:new Uint8Array(await readFile(path.join(root,'templates/leads/public/integrations/customerlead-project-guide.pdf'))),useSystemFonts:true}).promise;
+assert.equal(pdf.numPages,markers.length);
+const texts=[],images=[],links=new Set();
+for(let n=1;n<=pdf.numPages;n++){
+  const page=await pdf.getPage(n);
+  const text=(await page.getTextContent()).items.map(i=>i.str||'').join(' ');
+  assert(text.length>500,`Page ${n} is empty.`);
+  assert(text.toLowerCase().replace(/[^a-z0-9]/g,'').startsWith(markers[n-1]),`Spillover on page ${n}.`);
+  texts.push(text);
+  for(const a of await page.getAnnotations())if(a.url)links.add(a.url);
+  const viewport=page.getViewport({scale:1.05});
+  const canvas=createCanvas(Math.ceil(viewport.width),Math.ceil(viewport.height));
+  await page.render({canvas,canvasContext:canvas.getContext('2d'),viewport}).promise;
+  const bytes=canvas.toBuffer('image/png');
+  await writeFile(path.join(output,`page-${n}.png`),bytes);
+  images.push(await loadImage(bytes));
+}
+const full=texts.join('\n');
+for(const term of ['ReplyReviews','Google Sheets','Excel snapshot','Read existing lead','Reset deleted Gmail links','repair-n8n.ps1','Pending','Applied','Failed','24-hour','localhost:3001','Header Auth account 2'])assert(full.includes(term),'Missing guide topic '+term);
+assert(!/@@[A-Z_]+@@/.test(full),'Unfilled audit placeholder.');
+assert(!/AIza[0-9A-Za-z_-]{25,}|sk-(?:proj-)?[0-9A-Za-z_-]{30,}|Bearer [0-9a-f]{50,}/.test(full),'Possible credential in guide.');
+assert([...links].some(link=>link.includes('docs.google.com/spreadsheets/d/1IugQXI')));
+const sheet=createCanvas(900,Math.ceil(pdf.numPages/3)*450),ctx=sheet.getContext('2d');
+ctx.fillStyle='#e9e7ee';ctx.fillRect(0,0,sheet.width,sheet.height);
+for(let i=0;i<images.length;i++){const x=i%3*300+12,y=Math.floor(i/3)*450+25;ctx.fillStyle='#322944';ctx.font='13px sans-serif';ctx.fillText('Page '+(i+1),x,y-7);ctx.drawImage(images[i],x,y,276,390);}
+await writeFile(path.join(output,'contact-sheet.png'),sheet.toBuffer('image/png'));
+await writeFile(path.join(output,'text-review.json'),JSON.stringify({pages:pdf.numPages,characters:full.length,links:[...links],status:'All PDF pages rendered and checked; no spillover, missing topics, placeholders or credential strings.'},null,2));
+const count=pdf.numPages;
+await pdf.loadingTask.destroy();
+console.log(JSON.stringify({pages:count,characters:full.length,links:links.size,status:'PDF verification passed.'}));
