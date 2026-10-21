@@ -45,8 +45,8 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: #f7f8fc;
+  --foreground: #1b2340;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -56,11 +56,11 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: #626b80;
   --accent: #f1edff;
   --accent-foreground: #5930c4;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
+  --border: #e3e6ef;
   --input: oklch(0.922 0 0);
   --ring: #9876f7;
   --chart-1: oklch(0.646 0.222 41.116);
@@ -80,14 +80,15 @@
   --crm-blue: #2563eb;
   --crm-emerald: #047857;
   --crm-amber: #b45309;
+  --crm-rose: #be3455;
   --crm-neutral: #64748b;
   --crm-tone: var(--crm-violet);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: #11131c;
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: #1b1e2a;
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
@@ -96,7 +97,7 @@
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --muted-foreground: #adb5c7;
   --accent: #2e2540;
   --accent-foreground: #d4c4ff;
   --destructive: oklch(0.704 0.191 22.216);
@@ -120,6 +121,7 @@
   --crm-blue: #80b6ff;
   --crm-emerald: #65d9ac;
   --crm-amber: #f6c16b;
+  --crm-rose: #ff9bad;
   --crm-neutral: #a1aec0;
 }
 
@@ -164,9 +166,12 @@
 [data-tone="blue"] { --crm-tone: var(--crm-blue); }
 [data-tone="emerald"] { --crm-tone: var(--crm-emerald); }
 [data-tone="amber"] { --crm-tone: var(--crm-amber); }
+[data-tone="rose"] { --crm-tone: var(--crm-rose); }
 [data-tone="neutral"] { --crm-tone: var(--crm-neutral); }
 
 .crm-panel {
+  border-color: color-mix(in oklab, var(--crm-tone) 10%, var(--border));
+  box-shadow: 0 3px 14px color-mix(in oklab, var(--foreground) 3%, transparent);
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 .crm-panel:focus-within {
@@ -177,7 +182,7 @@
   border-radius: inherit;
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-  background: linear-gradient(100deg, color-mix(in oklab, var(--crm-tone) 6%, var(--card)), var(--card) 75%);
+  background: linear-gradient(100deg, color-mix(in oklab, var(--crm-tone) 9%, var(--card)), color-mix(in oklab, var(--crm-tone) 2%, var(--card)) 75%);
 }
 .crm-panel-mark, .crm-tone-icon { color: var(--crm-tone); }
 .crm-panel-mark {
@@ -206,10 +211,28 @@
 .crm-nav-link > .crm-nav-icon { color: var(--crm-tone); }
 .crm-stat-card {
   position: relative;
-  background: linear-gradient(135deg, color-mix(in oklab, var(--crm-tone) 7%, var(--card)), var(--card) 75%);
-  box-shadow: inset 0 2px 0 color-mix(in oklab, var(--crm-tone) 65%, transparent);
+  border-color: color-mix(in oklab, var(--crm-tone) 22%, var(--border));
+  background: linear-gradient(125deg, color-mix(in oklab, var(--crm-tone) 9%, var(--card)), var(--card) 85%);
+  box-shadow: inset 0 3px 0 color-mix(in oklab, var(--crm-tone) 65%, transparent), 0 3px 12px color-mix(in oklab, var(--crm-tone) 5%, transparent);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 .crm-stat-value { color: var(--crm-tone); }
+.crm-stat-icon {
+  color: var(--crm-tone);
+  background: linear-gradient(145deg, color-mix(in oklab, var(--crm-tone) 16%, var(--card)), color-mix(in oklab, var(--crm-tone) 6%, var(--card)));
+  border: 1px solid color-mix(in oklab, var(--crm-tone) 20%, var(--border));
+  box-shadow: 0 2px 5px color-mix(in oklab, var(--crm-tone) 6%, transparent);
+}
+.crm-stat-action { cursor: pointer; }
+.crm-stat-action:focus-visible {
+  outline: 2px solid var(--crm-tone);
+  outline-offset: 3px;
+}
+.crm-stat-action[aria-pressed="true"] {
+  border-color: color-mix(in oklab, var(--crm-tone) 65%, var(--border));
+  outline: 2px solid color-mix(in oklab, var(--crm-tone) 30%, transparent);
+  outline-offset: 1px;
+}
 .crm-guide-banner {
   border-color: color-mix(in oklab, var(--primary) 18%, var(--border));
   background: linear-gradient(110deg, color-mix(in oklab, var(--crm-violet) 8%, var(--card)), color-mix(in oklab, var(--crm-blue) 4%, var(--card)));
@@ -245,10 +268,49 @@
 .crm-faq[open] summary { color: var(--accent-foreground); background: color-mix(in oklab, var(--primary) 5%, var(--card)); }
 .crm-faq-chevron { transition: transform 160ms ease; }
 .crm-faq[open] .crm-faq-chevron { transform: rotate(180deg); }
-.crm-main { scrollbar-color: color-mix(in oklab, var(--primary) 24%, var(--border)) transparent; }
+.crm-main {
+  background: radial-gradient(ellipse 45rem 24rem at 100% 0%, color-mix(in oklab, var(--crm-violet) 5%, transparent), transparent),
+    radial-gradient(ellipse 35rem 24rem at 0% 100%, color-mix(in oklab, var(--crm-blue) 3%, transparent), transparent), var(--background);
+  scrollbar-color: color-mix(in oklab, var(--primary) 24%, var(--border)) transparent;
+}
+.crm-filter-bar {
+  background: linear-gradient(100deg, color-mix(in oklab, var(--crm-tone) 3%, var(--card)), var(--card) 80%);
+  border-radius: inherit;
+}
+.crm-main [data-slot="table-header"] {
+  background: linear-gradient(100deg, color-mix(in oklab, var(--crm-tone) 7%, var(--card)), color-mix(in oklab, var(--crm-blue) 3%, var(--card)));
+}
+.crm-main [data-slot="table-head"] { font-weight: 600; }
+.crm-main [data-slot="table-head"][aria-sort="ascending"],
+.crm-main [data-slot="table-head"][aria-sort="descending"] { color: var(--crm-tone); }
+.crm-main [data-slot="table-body"] [data-slot="table-row"] { transition: background-color 160ms ease; }
+.crm-main [data-slot="table-row"][data-state="selected"] { background: color-mix(in oklab, var(--primary) 7%, var(--card)); }
+.crm-empty-icon {
+  color: var(--crm-tone);
+  border-color: color-mix(in oklab, var(--crm-tone) 20%, var(--border));
+  background: linear-gradient(135deg, color-mix(in oklab, var(--crm-tone) 12%, var(--card)), color-mix(in oklab, var(--crm-blue) 5%, var(--card)));
+  box-shadow: 0 5px 16px color-mix(in oklab, var(--crm-tone) 7%, transparent);
+}
+.crm-dialog {
+  border-color: color-mix(in oklab, var(--crm-violet) 22%, var(--border));
+  background-image: radial-gradient(ellipse 30rem 10rem at 100% 0%, color-mix(in oklab, var(--crm-violet) 5%, transparent), transparent);
+}
+[data-slot="button"][data-variant="default"] {
+  background-image: linear-gradient(110deg, var(--primary), color-mix(in oklab, var(--primary) 85%, var(--crm-blue)));
+  box-shadow: 0 3px 9px color-mix(in oklab, var(--primary) 16%, transparent);
+}
 
 @media (hover: hover) and (pointer: fine) {
-  .crm-panel:hover { border-color: color-mix(in oklab, var(--crm-tone) 24%, var(--border)); }
+  .crm-panel:hover {
+    border-color: color-mix(in oklab, var(--crm-tone) 32%, var(--border));
+    box-shadow: 0 5px 18px color-mix(in oklab, var(--crm-tone) 6%, transparent);
+  }
+  .crm-stat-card:hover {
+    border-color: color-mix(in oklab, var(--crm-tone) 50%, var(--border));
+    box-shadow: inset 0 3px 0 var(--crm-tone), 0 6px 20px color-mix(in oklab, var(--crm-tone) 10%, transparent);
+  }
+  .crm-stat-action:hover { transform: translateY(-2px); }
+  .crm-main [data-slot="table-body"] [data-slot="table-row"]:hover { background: color-mix(in oklab, var(--crm-tone) 4%, var(--card)); }
   .crm-nav-link[data-sidebar="menu-button"]:hover { transform: translateX(2px); }
   .crm-interactive:hover {
     border-color: color-mix(in oklab, var(--crm-tone) 35%, var(--border));
@@ -269,7 +331,8 @@
 @media (prefers-reduced-motion: reduce) {
   [data-slot="sheet-content"], [data-slot="sheet-overlay"] { animation: none !important; transition: none !important; }
   .crm-panel, .crm-nav-link[data-sidebar="menu-button"], .crm-interactive,
+  .crm-stat-card, .crm-main [data-slot="table-body"] [data-slot="table-row"],
   .crm-inquiry-row, .crm-input, .crm-preference, .crm-faq, .crm-faq-chevron,
   .crm-switch, .crm-switch::after { transition: none; }
-  .crm-nav-link[data-sidebar="menu-button"]:hover, .crm-interactive:hover { transform: none; }
+  .crm-nav-link[data-sidebar="menu-button"]:hover, .crm-interactive:hover, .crm-stat-action:hover { transform: none; }
 }

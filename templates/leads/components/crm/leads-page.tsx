@@ -6,7 +6,8 @@ import { RecordFilters, FilterSelect, SearchFilter, SortControls, SortableTableH
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Inbox, AlertCircle, BadgeCheck } from "lucide-react";
+import { MetricCard, type CRMTone } from "./metric-card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -387,13 +388,15 @@ export function LeadsPage() {
       </PageHeading>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { title: "All leads", value: data.leads.length },
+          { title: "All leads", value: data.leads.length, icon: ClipboardList, tone: "violet" },
           {
             title: "New inquiries",
+            icon: Inbox, tone: "blue",
             value: data.leads.filter((l) => l.status === "New").length,
           },
           {
             title: "High or urgent (open)",
+            icon: AlertCircle, tone: "rose",
             value: data.leads.filter(
               (l) =>
                 ["High", "Urgent"].includes(l.priority) &&
@@ -402,19 +405,17 @@ export function LeadsPage() {
           },
           {
             title: "Qualified leads",
+            icon: BadgeCheck, tone: "emerald",
             value: data.leads.filter((l) => l.status === "Qualified").length,
           },
         ].map((s) => (
-          <Panel key={s.title} className="p-4">
-            <p className="text-xs text-muted-foreground">{s.title}</p>
-            <p className="mt-2 text-2xl font-semibold">{s.value}</p>
-          </Panel>
+          <MetricCard key={s.title} title={s.title} value={s.value} icon={s.icon} tone={s.tone as CRMTone} />
         ))}
       </div>
       <Panel>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+        <div className="crm-panel-heading flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <ClipboardList className="size-4 text-muted-foreground" />
+            <ClipboardList className="crm-tone-icon size-4" />
             Leads list{" "}
             <span className="rounded bg-muted px-1.5 text-xs font-normal text-muted-foreground">
               {filtered.length}

@@ -92,7 +92,7 @@ export function CalendarPage() {
       </Panel>
       <div className="grid items-start gap-5 2xl:grid-cols-[1fr_300px]">
         <Panel>
-          <div className="flex items-center justify-between gap-3 border-b p-4">
+          <div className="crm-panel-heading flex items-center justify-between gap-3 border-b p-4">
             <h2 className="text-sm font-semibold">
               {new Intl.DateTimeFormat("en", {
                 timeZone: "UTC",

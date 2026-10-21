@@ -27,7 +27,7 @@ export function RecordFilters({ search, children, filters = [], hasSearch = fals
 }) {
   const [expanded, setExpanded] = useState(false), id = useId();
   const active = filters.filter(filter => filter.value !== (filter.defaultValue ?? "all"));
-  return <div role="group" aria-label="Filters and sorting" className="border-b p-4">
+  return <div role="group" aria-label="Filters and sorting" className="crm-filter-bar border-b p-4">
     <div className={cn("flex flex-wrap items-end gap-2", compact && "[&>div:first-child]:basis-full")}>
       <div className="min-w-0 basis-full sm:max-w-sm sm:flex-1 [&>label]:w-full">{search}</div>
       <Button type="button" variant="outline" className="h-9" aria-label="Advanced filters" aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded(value => !value)}>

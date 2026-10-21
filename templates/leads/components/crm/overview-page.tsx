@@ -1,5 +1,6 @@
 "use client";
 import { ActionIcon } from "./action-icon";
+import { MetricCard, type CRMTone } from "./metric-card";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChartNoAxesCombined, Users, Sparkles, Clock3, ClipboardList } from "lucide-react";
@@ -135,24 +136,10 @@ export function OverviewPage() {
           </Link>
         )}
       </div>
-      <div className="grid grid-cols-2 divide-x divide-y overflow-hidden rounded-xl border bg-card xl:grid-cols-4 xl:divide-y-0">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {cards.map((c, index) => (
-          <Link
-            key={c.label}
-            href={c.href}
-            data-tone={["blue", "emerald", "violet", "amber"][index]}
-            className="crm-stat-card crm-interactive group px-5 py-5 sm:px-6"
-          >
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <c.icon className="crm-tone-icon size-4" />
-              {c.label}
-              <ActionIcon action="view" className="ml-auto opacity-0 group-hover:opacity-100" />
-            </p>
-            <p className="crm-stat-value my-4 text-3xl font-semibold tracking-tight">
-              {c.count}
-            </p>
-            <p className="text-[11px] text-muted-foreground">{c.detail}</p>
-          </Link>
+          <MetricCard key={c.label} title={c.label} value={c.count} description={c.detail}
+            icon={c.icon} href={c.href} tone={(["violet", "blue", "amber", "blue"] as CRMTone[])[index]} />
         ))}
       </div>
       <div className="grid gap-5 xl:grid-cols-[1.7fr_1fr]">

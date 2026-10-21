@@ -2,7 +2,8 @@
 import { ActionIcon } from "./action-icon";
 import { useState } from "react";
 import Link from "next/link";
-import { ListTodo } from "lucide-react";
+import { ListTodo, Clock3, CheckCircle2 } from "lucide-react";
+import { MetricCard } from "./metric-card";
 import { Button } from "@/components/ui/button";
 import { useCRM } from "./provider";
 import { TaskForm } from "./forms";
@@ -53,7 +54,7 @@ export function TasksPage() {
           New task
         </Button>
       </PageHeading>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         {[
           {
             title: "Open tasks",
@@ -70,10 +71,9 @@ export function TasksPage() {
             count: data.tasks.filter((t) => t.completed).length,
           },
         ].map((c) => (
-          <Panel className="crm-stat-card p-5" key={c.title} tone={c.title === "Overdue" ? "amber" : c.title === "Completed" ? "emerald" : "violet"}>
-            <p className="text-xs text-muted-foreground">{c.title}</p>
-            <p className="crm-stat-value mt-3 text-2xl font-semibold">{c.count}</p>
-          </Panel>
+          <MetricCard key={c.title} title={c.title} value={c.count}
+            icon={c.title === "Overdue" ? Clock3 : c.title === "Completed" ? CheckCircle2 : ListTodo}
+            tone={c.title === "Overdue" ? "amber" : c.title === "Completed" ? "emerald" : "blue"} />
         ))}
       </div>
       <Panel

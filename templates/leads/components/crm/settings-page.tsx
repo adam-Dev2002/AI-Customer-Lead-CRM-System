@@ -250,7 +250,7 @@ export function SettingsPage({ canManageLogo = false, customerForm = null }: { c
           </div>
         </Panel>
         <AutomationSettings settings={settings} update={update} />
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-5 py-4 shadow-sm">
+        <div className="crm-panel flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-5 py-4 shadow-sm">
           <span
             className={`flex items-center gap-2 text-xs ${dirty ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}
           >

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useCRM } from "./provider";
 import { dateFormatter } from "@/lib/crm/date-format";
+import type { CRMTone } from "./metric-card";
 export { PersonAvatar } from "./person-avatar";
 
 export const selectClass =
@@ -75,7 +76,7 @@ export function Panel({
   title?: string;
   action?: ReactNode;
   icon?: LucideIcon;
-  tone?: "violet" | "blue" | "emerald" | "amber" | "neutral";
+  tone?: CRMTone;
 }) {
   return (
     <section data-tone={tone} className={cn("crm-panel min-w-0 rounded-xl border bg-card", className)}>
@@ -124,9 +125,9 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-      <span className="rounded-xl border bg-background p-3">
-        <Inbox className="size-6 text-muted-foreground" />
+    <div className="crm-empty-state flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+      <span className="crm-empty-icon rounded-2xl border p-4">
+        <Inbox className="size-6" />
       </span>
       <h3 className="font-medium">{title}</h3>
       <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
@@ -200,7 +201,7 @@ export function Modal({
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
         <Dialog.Content
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border bg-card p-6 shadow-xl",
+            "crm-dialog fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border bg-card p-6 shadow-xl",
             wide ? "max-w-2xl" : "max-w-lg",
           )}
         >

@@ -1,5 +1,6 @@
 "use client";
 import { ActionIcon } from "./action-icon";
+import { MetricCard, type CRMTone } from "./metric-card";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -142,22 +143,10 @@ export function FollowUpsPage() {
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {cards.map((c, index) => (
-          <button
-            key={c.title}
-            aria-label={`${c.title} ${c.count}`}
-            aria-describedby={`followup-stat-${c.filter}`}
-            data-tone={["violet", "blue", "violet", "amber", "emerald", "amber"][index]}
-            aria-pressed={state === c.filter}
-            onClick={() => changeState(c.filter)}
-            className="crm-stat-card crm-interactive rounded-xl border bg-card p-5 text-left aria-pressed:ring-2 aria-pressed:ring-primary/40"
-          >
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <c.icon className="crm-tone-icon size-4" />
-              {c.title}
-            </p>
-            <p className="crm-stat-value mt-3 text-2xl font-semibold">{c.count}</p>
-            <p id={`followup-stat-${c.filter}`} className="mt-2 text-[11px] leading-5 text-muted-foreground">{c.detail}</p>
-          </button>
+          <MetricCard key={c.title} title={c.title} value={c.count} icon={c.icon}
+            description={c.detail} descriptionId={`followup-stat-${c.filter}`}
+            tone={(["violet", "blue", "violet", "amber", "emerald", "rose"] as CRMTone[])[index]}
+            pressed={state === c.filter} onClick={() => changeState(c.filter)} />
         ))}
       </div>
       {dueCount === 0 && (
@@ -168,7 +157,7 @@ export function FollowUpsPage() {
           </> : query.trim() ? "No scheduled follow-ups match your search." : "Nothing due now. No upcoming follow-up is scheduled."}</span>
         </p>
       )}
-      <div className="flex items-start gap-3 rounded-lg border bg-card px-4 py-3">
+      <div className="crm-guide-banner flex items-start gap-3 rounded-lg border bg-card px-4 py-3">
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#6e3ff3]" />
         <p className="text-xs leading-6 text-muted-foreground">
           Preview, edit, schedule and approve emails here. Sending requires customer permission,
