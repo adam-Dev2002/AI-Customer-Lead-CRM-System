@@ -10,7 +10,7 @@ export async function startSupabaseMock(options = {}) {
   const password = "isolated-qa-password";
   const accounts = [owner, outsider, member], passwords = new Map(accounts.map(account => [account.email, password])), confirmations = new Map();
   let ownerAccess = true;
-  const control = { signupFailure: null, resetFailure: null };
+  const control = { signupFailure: null, resetFailure: null, emailAutoConfirm: options.emailAutoConfirm === true, signupRequests: 0, confirmationEmails: 0 };
   const userObject = user => ({ ...user, aud: "authenticated", role: "authenticated", email_confirmed_at: user.confirmed === false ? null : "2026-01-01T00:00:00Z", app_metadata: { provider: "email", providers: ["email"] }, user_metadata: user.user_metadata || {}, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" });
   async function confirmSignup(email) {
     const account = accounts.find(item => item.email === email);
@@ -32,18 +32,19 @@ export async function startSupabaseMock(options = {}) {
     if (request.headers.apikey !== key) return send({ message: "Invalid QA key" }, 401);
     const user = tokens.get(request.headers.authorization?.replace(/^Bearer /, ""));
     const readBody = async () => { let raw = ""; for await (const chunk of request) raw += chunk; return JSON.parse(raw || "{}"); };
-    if (url.pathname === "/auth/v1/settings") return send({ external: { email: true }, disable_signup: !options.signupEnabled, mailer_autoconfirm: false });
+    if (url.pathname === "/auth/v1/settings") return send({ external: { email: true }, disable_signup: !options.signupEnabled, mailer_autoconfirm: control.emailAutoConfirm });
     if (url.pathname === "/auth/v1/signup" && request.method === "POST") {
+      control.signupRequests++;
       if (control.signupFailure) return send({ msg: "Simulated signup service failure", code: control.signupFailure.code }, control.signupFailure.status);
       if (!options.signupEnabled) return send({ msg: "Signups not allowed", code: "signup_disabled" }, 422);
       const body = await readBody();
       const existing = accounts.find(item => item.email === body.email);
-      if (existing) return send({ ...userObject(existing), identities: [] });
-      const account = { id: randomUUID(), email: body.email, confirmed: false, user_metadata: body.data || {} };
+      if (existing) return control.emailAutoConfirm ? send({ msg: "User already registered", code: "user_already_exists" }, 422) : send({ ...userObject(existing), identities: [] });
+      const account = { id: randomUUID(), email: body.email, confirmed: control.emailAutoConfirm, user_metadata: body.data || {} };
       accounts.push(account); passwords.set(account.email, body.password);
-      confirmations.set(randomUUID(), account.email);
+      if (!control.emailAutoConfirm) { confirmations.set(randomUUID(), account.email); control.confirmationEmails++; }
       await options.onSignup?.(userObject(account));
-      return send(userObject(account));
+      return control.emailAutoConfirm ? send({ access_token: token(account), token_type: "bearer", expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: "qa-refresh-" + randomUUID(), user: userObject(account) }) : send(userObject(account));
     }
     if (url.pathname === "/auth/v1/verify" && request.method === "POST") {
       const body = await readBody(), email = confirmations.get(body.token_hash);

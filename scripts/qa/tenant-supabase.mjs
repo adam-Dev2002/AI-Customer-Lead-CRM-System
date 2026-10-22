@@ -8,7 +8,7 @@ import { createEmptyWorkspace } from '../../templates/leads/lib/crm/new-workspac
 
 const { PGlite } = createRequire(new URL('../../templates/leads/package.json', import.meta.url))('@electric-sql/pglite');
 
-export async function startTenantSupabase({ legacyData = createEmptyWorkspace('Existing ClearFlow'), signupEnabled = true } = {}) {
+export async function startTenantSupabase({ legacyData = createEmptyWorkspace('Existing ClearFlow'), signupEnabled = true, emailAutoConfirm = true } = {}) {
   const db = new PGlite(), secret = 'sb_secret_tenant_isolated_qa', objects = new Map();
   const control = { unavailable: false, lostCommits: 0, commits: 0, missingRPCs: new Set() }, calls = [];
   let server, auth;
@@ -47,7 +47,7 @@ export async function startTenantSupabase({ legacyData = createEmptyWorkspace('E
       await db.exec(await readFile(new URL('../../supabase/migrations/' + migration, import.meta.url), 'utf8'));
     }
     await rpc('crm_store_import', { p_data: legacyData });
-    auth = await startSupabaseMock({ signupEnabled, onSignup: mirrorAccount, onConfirmed: mirrorAccount, resolveMembership: async user => (await sql('select user_id, workspace_id, role, display_name from public.crm_workspace_members where user_id = $1::uuid', [user.id])).rows });
+    auth = await startSupabaseMock({ signupEnabled, emailAutoConfirm, onSignup: mirrorAccount, onConfirmed: mirrorAccount, resolveMembership: async user => (await sql('select user_id, workspace_id, role, display_name from public.crm_workspace_members where user_id = $1::uuid', [user.id])).rows });
     for (const user of auth.accounts || [auth.owner, auth.outsider, auth.member]) await mirrorAccount(user);
     for (const [user, role] of [[auth.owner, 'owner'], [auth.member, 'member']]) {
       await sql("insert into public.crm_workspace_members(user_id,workspace_id,role,display_name) values ($1,'clearflow',$2,$3)", [user.id, role, role === 'owner' ? 'QA Owner' : 'QA Member']);

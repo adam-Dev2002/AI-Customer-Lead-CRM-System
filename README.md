@@ -17,7 +17,7 @@ local n8n automation is still pending.
 
 The [business accounts and hosting handover](docs/business-accounts-and-hosting.md)
 covers the new private-business signup release. Production rollout still needs
-the Supabase workspace migration, signup/confirmation email configuration and
+the Supabase workspace migration, immediate-signup policy configuration and
 deployment verification. New businesses need their own automation connections;
 creating an account does not connect Gmail.
 
@@ -73,7 +73,7 @@ n8n automation separately; Vercel does not run its background schedules.
 
 Follow the [setup and hosting guide](docs/setup-combined-workflow.md).
 A push can trigger Vercel deployment when Git integration is enabled; it does
-not apply Supabase migrations, configure confirmation email or activate n8n.
+not apply Supabase migrations, change Supabase authentication settings or activate n8n.
 For a commercial service, check the current hosting terms: Vercel Hobby permits
 personal, non-commercial use only. [Official plan rules](https://vercel.com/docs/plans/hobby)
 

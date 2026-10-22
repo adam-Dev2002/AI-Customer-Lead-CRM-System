@@ -2,8 +2,8 @@
 
 **22 October 2026 update:** the private-business signup release supersedes this
 guide's original invitation-only setup. Follow [business accounts and hosting](business-accounts-and-hosting.md)
-for the new migration, email confirmation/SMTP settings and deployment checks.
-Those live rollout steps remain pending. The original owner and deliberately
+for the new migration, immediate signup without email confirmation, and deployment checks.
+Verify the live rollout steps in that guide. The original owner and deliberately
 invited ClearFlow staff keep their existing workspace; new public accounts get
 their own empty business after the release is applied. Signup does not connect Gmail.
 

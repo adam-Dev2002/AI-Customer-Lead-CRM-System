@@ -45,6 +45,12 @@ try {
     assert(!JSON.stringify(body).includes("Simulated"), "raw provider diagnostics must not reach the browser");
   };
   const beforeFailures = supabase.accounts.length;
+  const beforeProviderRequests = supabase.auth.control.signupRequests;
+  supabase.auth.control.emailAutoConfirm = false;
+  await expectFailure(await request({ ...signup, email: "confirmation-on.qa@example.com" }), "AUTH_SIGNUP_POLICY", /Account creation is being set up/);
+  assert.equal(supabase.auth.control.signupRequests, beforeProviderRequests, "confirmation-required projects must not receive a signup request");
+  assert.equal(supabase.auth.control.confirmationEmails, 0);
+  supabase.auth.control.emailAutoConfirm = true;
   supabase.control.missingRPCs.add("crm_workspace_connection");
   await expectFailure(await request({ ...signup, email: "setup-missing.qa@example.com" }), "AUTH_WORKSPACE_SETUP", /Account creation is being set up/);
   supabase.control.missingRPCs.clear();
@@ -67,19 +73,31 @@ try {
   supabase.auth.control.resetFailure = null;
   assert.equal(supabase.accounts.length, beforeFailures, "failed setup/email requests must not create accounts");
 
+  const interrupted = { ...signup, email: "workspace-interrupted.qa@example.com" };
+  supabase.control.missingRPCs.add("crm_provision_workspace");
+  const interruptedSignup = await request(interrupted);
+  await expectFailure(interruptedSignup.clone(), "AUTH_WORKSPACE_UNAVAILABLE", /Your account was created/);
+  const interruptedCookie = interruptedSignup.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+  assert.equal((await fetch(base + "/api/crm", { headers: { Cookie: interruptedCookie } })).status, 401, "failed workspace opening must clear the incomplete session");
+  supabase.control.missingRPCs.clear();
+  assert.equal((await request({ action: "login", email: interrupted.email, password: interrupted.password })).status, 200, "an account created during a temporary workspace failure recovers through ordinary sign-in");
+
   const fresh = { ...signup, email: "account.qa@example.com" };
   const registration = await request(fresh);
   assert.equal(registration.status, 200);
   const registrationBody = await registration.json();
-  assert(registrationBody.message.includes("Check your inbox"));
-  assert(!registration.headers.get("set-cookie")?.includes("auth-token="), "signup must not grant a CRM session");
-  assert.equal((await request({ action: "login", email: fresh.email, password: fresh.password })).status, 401, "unconfirmed account cannot sign in");
+  assert.equal(registrationBody.next, "/");
+  assert(registration.headers.get("set-cookie")?.includes("auth-token="), "signup grants the new account a session immediately");
+  const registeredCookie = registration.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+  const immediate = await fetch(base + "/api/crm", { headers: { Cookie: registeredCookie } });
+  assert.equal(immediate.status, 200, "the signup session must open its private CRM without a separate login");
+  assert.equal((await immediate.json()).settings.businessName, fresh.businessName);
   const duplicate = await request(fresh);
-  assert.deepEqual(await duplicate.json(), registrationBody, "registration must not reveal whether an email already exists");
-  const confirmation = await fetch(base + "/auth/confirm?type=signup&token_hash=" + supabase.confirmationToken(fresh.email), { redirect: "manual" });
-  assert.equal(confirmation.status, 307);
-  assert.equal(new URL(confirmation.headers.get("location"), base).pathname, "/login");
-  assert.equal(new URL(confirmation.headers.get("location"), base).searchParams.get("reason"), "confirmed");
+  assert.equal(duplicate.status, 400);
+  assert.match((await duplicate.json()).error, /Try signing in or resetting your password/);
+  assert(!duplicate.headers.get("set-cookie")?.includes("auth-token="), "duplicate signup must not grant access to the existing account");
+  assert.equal(supabase.confirmationToken(fresh.email), undefined);
+  assert.equal(supabase.auth.control.confirmationEmails, 0);
   assert.equal((await fetch(base + "/api/crm")).status, 401);
 
   browser = await chromium.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true });
@@ -89,7 +107,7 @@ try {
   await context.route("**/api/auth", async route => {
     const payload = route.request().postDataJSON(); submissions.push(payload);
     await new Promise(resolve => setTimeout(resolve, 250));
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, message: "Check your inbox for an account confirmation email. Your business workspace opens after you confirm your email and sign in." }) });
+    return route.continue();
   });
   await page.goto(base + "/login");
   await page.getByRole("button", { name: "Create an account", exact: true }).click();
@@ -110,12 +128,19 @@ try {
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByRole("button", { name: "Creating account…", exact: true }).waitFor();
   assert(await page.getByLabel("Email address", { exact: true }).isDisabled());
-  await page.getByRole("status").filter({ hasText: "Check your inbox" }).waitFor();
+  await page.locator('[data-crm-ready="true"]').waitFor();
+  assert.equal(new URL(page.url()).pathname, "/");
   assert.equal(submissions.length, 1);
   assert.equal(submissions[0].businessName, "Isolated QA Business");
-  assert.equal(await page.getByLabel("Password", { exact: true }).inputValue(), "");
+  const opened = await (await context.request.get(base + "/api/crm")).json();
+  assert.equal(opened.settings.businessName, "Isolated QA Business");
+  assert.deepEqual(opened.leads, []);
+  assert.equal(supabase.auth.control.confirmationEmails, 0);
+  await page.screenshot({ path: path.join(output, "signup-opened-workspace.png"), fullPage: true });
+  await context.unroute("**/api/auth");
+  assert.equal((await context.request.post(base + "/api/auth", { headers: { Origin: base }, data: { action: "logout" } })).status(), 200);
   assert.equal((await context.request.get(base + "/api/crm")).status(), 401);
-  await page.getByRole("button", { name: "Back to sign in", exact: true }).click();
+  await page.goto(base + "/login");
   await page.getByRole("button", { name: "Forgot your password?", exact: true }).click();
   await page.getByRole("heading", { name: "Reset your password", exact: true }).waitFor();
   assert.equal(await page.getByLabel("Password", { exact: true }).count(), 0);
@@ -129,7 +154,6 @@ try {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await page.screenshot({ path: path.join(output, "signup-mobile-dark.png"), fullPage: true });
 
-  await context.unroute("**/api/auth");
   const login = async (session, email, password) => {
     const result = await session.request.post(base + "/api/auth", { headers: { Origin: base }, data: { action: "login", email, password } });
     assert.equal(result.status(), 200, await result.text());
@@ -164,7 +188,6 @@ try {
 
   const second = { ...signup, businessName: "Second private business", email: "second.qa@example.com" };
   assert.equal((await request(second)).status, 200);
-  await fetch(base + "/auth/confirm?type=signup&token_hash=" + supabase.confirmationToken(second.email), { redirect: "manual" });
   const secondContext = await browser.newContext();
   await login(secondContext, second.email, second.password);
   const other = await (await secondContext.request.get(base + "/api/crm")).json();
@@ -221,7 +244,8 @@ try {
   assert.equal((await (await context.request.get(base + "/api/crm")).json()).mailJobs.length, 0);
   await ownerContext.close(); await secondContext.close();
   assert.deepEqual(errors, []);
-  console.log("Passed signup validation, duplicate privacy, confirmation callback, private empty workspaces, separate business writes, preserved original workspace, cross-business record/report denial, token-scoped n8n event/config/sync/mail routes and rotation, assistant isolation, desktop/mobile layout. Auth/email and files were simulated; no real accounts or emails created.");
+  assert.equal(supabase.auth.control.confirmationEmails, 0);
+  console.log("Passed immediate signup and dashboard navigation without confirmation emails, signup-policy guard, duplicate denial, signup validation, private empty workspaces, separate business writes, preserved original workspace, cross-business record/report denial, token-scoped n8n routes and rotation, assistant isolation, desktop/mobile layout. Auth and files were simulated; no real accounts or emails created.");
 } finally {
   await browser?.close();
   if (server.pid) server.kill("SIGTERM");

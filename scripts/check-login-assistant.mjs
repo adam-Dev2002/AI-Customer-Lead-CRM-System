@@ -54,7 +54,7 @@ try {
   await login(page, supabase.owner.email, "wrong-password");
   await page.getByRole("alert").filter({ hasText: "Check your email and password" }).waitFor();
   await login(page, supabase.outsider.email);
-  await page.getByRole("alert").filter({ hasText: "Confirm your email before opening your workspace" }).waitFor();
+  await page.getByRole("alert").filter({ hasText: "Your account cannot open this workspace yet" }).waitFor();
   assert.equal((await context.request.get(base + "/api/crm")).status(), 401);
   await login(page);
   await page.getByRole("heading", { name: "Your business, at a glance" }).waitFor();

@@ -8,11 +8,13 @@ The current website runs on Vercel. Supabase stores application logins and the m
 
 When Docker/n8n is stopped, cloud sign-in and saved CRM records can remain available, but local email scanning, form intake, Sheets write-back, confirmed sending and follow-ups stop. Queuing a reply or approving its text does not prove delivery.
 
-The 21 October deployment was one shared ClearFlow business. Its invited staff accounts saw the same records and used the same connected Gmail and Sheet. The private-business account changes in this release require the database migration, Supabase signup/email configuration and a new application deployment before they are available on the existing website. Applying that SQL, configuring SMTP and proving external signup delivery have not been completed by preparing this release. It does not itself move or start n8n.
+The 21 October deployment was one shared ClearFlow business. Its invited staff accounts saw the same records and used the same connected Gmail and Sheet. The current account release uses **immediate signup without an email confirmation**, as explicitly selected by the owner. It requires the private-workspace migration, the matching Supabase authentication policy and a new application deployment. Code preparation does not apply SQL or change the platform policy. It does not move or start n8n.
 
 ## What a new business account means
 
-After this release is applied, a person can create an account with their email, confirm that address and sign in. A verified account without an existing membership receives its own empty business workspace. Existing ClearFlow memberships and records stay with ClearFlow. A different email address is an identity; the server's workspace membership determines which business records that identity may access.
+After this release is applied, a person supplies a business name, email and password. Supabase creates the account and session; the app validates that session, creates the person's empty business workspace and opens the dashboard immediately. No signup confirmation email is sent. The email address is not proven to belong to the person: the owner explicitly chose that tradeoff. Supabase automatically marks the new account confirmed under this project policy. Existing ClearFlow memberships and records stay with ClearFlow; server-checked membership determines access to business records. [Supabase authentication settings](https://supabase.com/docs/guides/auth/general-configuration)
+
+Supabase is already the application's database. Supabase Auth stores account identities and password hashes; private CRM state and workspace memberships live in the same project. A custom plaintext-password table is unnecessary. [Supabase password storage](https://supabase.com/docs/guides/auth/password-security)
 
 The intended separation covers leads, messages, drafts, tasks, settings, activity, sync queues, send jobs, reports and uploaded files. A new business must not inherit ClearFlow's customers, pending emails, saved business facts or samples. Existing users keep their existing workspace rather than creating another copy of it on each sign-in.
 
@@ -26,64 +28,41 @@ The current dashboard does not provide a complete self-service Google OAuth conn
 2. In the existing Supabase SQL Editor, run [202610220001_crm_private_workspaces.sql](../supabase/migrations/202610220001_crm_private_workspaces.sql). Its prerequisites are the already-applied [workspace access migration](../supabase/migrations/202610200001_crm_workspace_access.sql) and [cloud storage migration](../supabase/migrations/202610210001_crm_cloud_storage.sql). It retains the legacy ClearFlow state and adds private workspace/token support. Do not re-import the old local CRM snapshot, reset the database or run the sample-data import.
 3. Verify the existing `clearflow` membership and workspace state remain present. New workspace IDs must be distinct. Keep the server-only Supabase key private; browser access must still use the publishable key and the authenticated application routes.
 4. Deploy this release to the existing Vercel project, using Root Directory `templates/leads` and the existing Production environment. Preserve `CRM_STORAGE_BACKEND=supabase`, the matching Supabase URL/keys and the existing private `N8N_WEBHOOK_SECRET`. Environment edits require a new deployment. Do not commit `.env.local` or private workflow exports.
-5. Configure signup and confirmation delivery as below. Test with two addresses you control. Confirm each new account starts empty, each sees only its own saved changes, signing out denies CRM access and the original owner still sees the preserved ClearFlow records. Check direct record/report/file requests as well as the page list.
+5. Configure immediate signup as below. Test with two addresses you control. Confirm signup opens each empty workspace directly, no confirmation email is sent, each sees only its own saved changes, signing out denies CRM access and the original owner still sees the preserved ClearFlow records. Check direct record/report/file requests as well as the page list.
 6. Test the old authenticated ClearFlow automation connection and a new business's separate connection without sending mail. Keep new automations inactive until their workspace/token, Gmail account and Sheet are verified. Perform a controlled live send only with an explicit owner confirmation.
 
 Code pushed to GitHub, a successful build, applied SQL and a verified live deployment are separate checkpoints. Record which ones actually completed. If Vercel deploys automatically from `main`, apply the compatible database migration before routing users to the new signup behavior; verify the deployed build after the push.
 
-## Enable Supabase email signup
+## Enable immediate signup
+
+The latest read-only check found the private-workspace migration installed and
+signup enabled, with Confirm Email still on. The required remaining policy change
+is **Confirm Email off**. This code release does not toggle the dashboard setting.
+
+1. Open the existing Supabase project ? **Authentication ? Sign In / Providers ? Email**. Keep email/password signup enabled and turn **Confirm Email off**, then save. This replaces the earlier confirmation-required setup. The app checks this setting before calling signup; while confirmation is still on it returns `AUTH_SIGNUP_POLICY` without creating an account or requesting a signup email. [Supabase settings](https://supabase.com/docs/guides/auth/general-configuration)
+2. Apply the workspace SQL and retain the five Production Vercel environment variables described above. Deploy the latest main-branch code.
+3. Use the public Production address, currently [the -oyh1 CRM login](https://ai-customer-lead-crm-system-oyh1.vercel.app/login). A read-only check confirmed the previous long deployment-specific address redirects to Vercel's own sign-in, while this Production address serves the CRM publicly. Customers should use the public CRM address and create only a CRM account. [Vercel Authentication](https://vercel.com/docs/deployment-protection/methods-to-protect-deployments/vercel-authentication)
+4. Choose **Create an account**, enter a new controlled email/business/password and submit. Expect the dashboard to open immediately with an empty workspace and no confirmation email. Refresh to verify persistence, sign out, and test ordinary email/password sign-in.
+5. Repeat with another controlled account and verify each business's records remain private. Existing users should use **Sign in**; duplicate signup never signs someone into an existing account.
+
+The project still checks the actual Supabase session and admin-managed membership. It never grants ClearFlow access based only on an email or copies ClearFlow integrations. The existing SQL's confirmation timestamp is set automatically by Supabase when Confirm Email is off; it is not evidence of an inbox verification step.
+
+Password recovery remains a separate email action. Keep the public Production Site URL and reset/invite redirect URLs in **Authentication ? URL Configuration**. Configure custom SMTP before relying on password-reset emails to external users. Existing confirmation links remain supported for accounts from the earlier flow. No SMTP sender is needed solely for new immediate signup. [Supabase SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
 
 ### If Create account returns HTTP 503
 
-The application now returns a safe `code` and `requestId` with failures. Vercel
-Runtime Logs include that reference, action and phase, without passwords, email
-addresses or keys. A signup error must not be treated as successful account creation.
+Failures include a safe `code` and `requestId`; Vercel Runtime Logs record action/phase without passwords, emails or keys.
 
-1. Open the existing Vercel project's **Production deployment → Visit**, rather
-   than retaining a deployment-specific URL. The URL supplied during the 22 October
-   investigation was protected by Vercel sign-in, so its runtime logs/settings
-   could not be inspected from the public site.
-2. Check **Settings → Environment Variables → Production** for all five existing
-   values: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
-   `CRM_STORAGE_BACKEND=supabase`, `SUPABASE_SECRET_KEY`, and `N8N_WEBHOOK_SECRET`.
-   Copy the matching private values locally; do not paste them into chat. Saving
-   `.env.local` on your PC does not update Vercel. Redeploy after changing variables.
-   Keep live secrets out of Preview environments. [Vercel environment changes](https://vercel.com/docs/environment-variables/managing-environment-variables)
-3. `AUTH_CONFIGURATION` means the Auth client or shared database limits are
-   unavailable. Check the phase in Runtime Logs and the Production environment
-   before retrying. This is distinct from `AUTH_RATE_LIMIT` (HTTP 429).
-4. `AUTH_WORKSPACE_SETUP` means the read-only workspace readiness check failed.
-   Apply the new private-workspace migration above and verify server database
-   access. A read-only check on 22 October found email signup and confirmation
-   enabled, but `crm_provision_workspace` was absent and the attempted signup
-   account had not been created. The release now checks workspace setup before
-   asking Supabase to create an account.
-5. `AUTH_EMAIL_SETUP` means confirmation/reset email delivery needs configuration;
-   use the SMTP steps below. `AUTH_SIGNUP_DISABLED` means signup is disabled at the
-   provider. `AUTH_UNAVAILABLE` covers temporary provider/network errors and has
-   action-specific wording. Do not disable email confirmation or insert a new
-   user into ClearFlow to work around these failures.
+- `AUTH_SIGNUP_POLICY`: Confirm Email is still on, policy could not match the signup session, or the provider changed settings during signup. Save the immediate-signup policy first.
+- `AUTH_CONFIGURATION`: Auth settings or shared database quotas are unavailable. Verify the Production environment, including `CRM_STORAGE_BACKEND=supabase` and the matching server-only key. Editing local `.env.local` does not update Vercel; redeploy after environment changes. [Vercel environment changes](https://vercel.com/docs/environment-variables/managing-environment-variables)
+- `AUTH_WORKSPACE_SETUP`: The workspace readiness check failed. Apply the private-workspace migration and verify server database access before creating accounts.
+- `AUTH_WORKSPACE_UNAVAILABLE`: The account exists but opening/provisioning its workspace failed. The app clears the incomplete session. Restore database access and use **Sign in**; do not repeatedly create the same account.
+- `AUTH_SIGNUP_DISABLED`: Signup or the email/password provider is disabled.
+- `AUTH_RATE_LIMIT` (HTTP 429): Wait before retrying.
+- `AUTH_EMAIL_SETUP`: An explicitly requested email action, such as password recovery, needs its sender configured. New immediate signup does not depend on confirmation mail.
+- `AUTH_UNAVAILABLE`: A temporary provider or network error; the message names the attempted action.
 
-After setup, make one registration attempt using your controlled address, confirm
-the email and sign in. Verify its workspace is empty and separate from ClearFlow.
-The automated failure checks use simulated email only; they do not establish that
-the live SMTP sender is configured or that a real confirmation email was delivered.
-
-Use the existing project's Supabase Dashboard. These are application logins, separate from GitHub, Vercel, Supabase Dashboard and n8n editor accounts.
-
-1. Open **Authentication → Sign In / Providers → Email**. Enable email/password sign-in and **Allow new users to sign up**. Leave **Confirm Email** on. Supabase's hosted email/password signup normally requires confirmation; disabling confirmation assumes an address is already verified. [Supabase configuration](https://supabase.com/docs/guides/auth/general-configuration), [password signup](https://supabase.com/docs/guides/auth/passwords)
-2. Open **Authentication → URL Configuration**. Set **Site URL** to the actual Vercel Production origin. Add the application's exact Production `/auth/confirm?type=signup`, `/auth/callback` and `/auth/callback?next=/update-password` redirect URLs. Retain local callbacks only when still needed. Use a stable Production address in real confirmation/reset emails. [Redirect configuration](https://supabase.com/docs/guides/auth/redirect-urls)
-3. Configure **Authentication → Email → SMTP Settings** with your email provider's host, port, username, password and verified sender address. Publish the sender-domain DNS records required by that provider. Keep the password private. Supabase's built-in sender delivers only to organization team addresses, currently permits two messages per hour and offers best-effort delivery; it cannot support arbitrary business signup emails. Use custom SMTP or a separately implemented Send Email hook for real users. Do not disable email confirmation as a workaround. [Supabase SMTP requirements](https://supabase.com/docs/guides/auth/auth-smtp) The existing n8n Gmail OAuth credential does not configure this separate authentication-email service.
-4. Check the **Confirm signup** template against the release's confirmation handler. For the existing token-hash handler, use the actual Production origin, for example:
-
-   ```html
-   <a href="https://YOUR-PRODUCTION-ORIGIN/auth/confirm?token_hash={{ .TokenHash }}&type=signup">Confirm email</a>
-   ```
-
-   Keep recovery links on `/auth/confirm` with `type=recovery` and invitation links with `type=invite`. Confirmation/reset links are private and one-time. Test the actual rendered email and link, including expiry/error handling.
-5. Create one controlled account from the public login page. Verify the email arrives, confirmation returns to the correct website, signing in opens its empty business and password recovery works. Check Supabase Auth logs and the SMTP provider's delivery log if mail is absent. Saving SMTP settings alone is not proof of delivery.
-
-Supabase Free has its own usage limits and currently pauses inactive projects after a week; a free database is not an uptime guarantee. Keep independent backups and review actual usage before a wider launch. [Supabase pricing](https://supabase.com/pricing)
+The isolated automated checks use fake Auth/Storage and real embedded PostgreSQL. They prove app behavior and workspace separation, not that a live platform toggle has been changed or a live email has been delivered.
 
 ## Connect one new business's automation
 

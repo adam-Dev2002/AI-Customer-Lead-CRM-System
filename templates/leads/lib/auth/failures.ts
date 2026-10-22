@@ -1,5 +1,5 @@
 export type AuthAction = "login" | "signup" | "reset" | "password" | "logout";
-export type AuthFailureCode = "AUTH_CONFIGURATION" | "AUTH_WORKSPACE_SETUP" | "AUTH_EMAIL_SETUP" | "AUTH_SIGNUP_DISABLED" | "AUTH_RATE_LIMIT" | "AUTH_WEAK_PASSWORD" | "AUTH_UNAVAILABLE";
+export type AuthFailureCode = "AUTH_CONFIGURATION" | "AUTH_WORKSPACE_SETUP" | "AUTH_WORKSPACE_UNAVAILABLE" | "AUTH_EMAIL_SETUP" | "AUTH_SIGNUP_DISABLED" | "AUTH_SIGNUP_POLICY" | "AUTH_RATE_LIMIT" | "AUTH_WEAK_PASSWORD" | "AUTH_UNAVAILABLE";
 
 export function authFailureMessage(action: AuthAction, code: AuthFailureCode) {
   if (code === "AUTH_RATE_LIMIT") return "Too many attempts. Please wait a few minutes and try again.";
@@ -7,7 +7,8 @@ export function authFailureMessage(action: AuthAction, code: AuthFailureCode) {
   if (code === "AUTH_EMAIL_SETUP") return action === "reset"
     ? "Password reset emails are not available yet. Please contact support."
     : "Account confirmation emails are not available yet. Please contact support.";
-  if (code === "AUTH_WORKSPACE_SETUP" || code === "AUTH_SIGNUP_DISABLED") return "Account creation is being set up. Please contact support.";
+  if (code === "AUTH_WORKSPACE_SETUP" || code === "AUTH_SIGNUP_DISABLED" || code === "AUTH_SIGNUP_POLICY") return "Account creation is being set up. Please contact support.";
+  if (code === "AUTH_WORKSPACE_UNAVAILABLE") return "Your account was created, but your workspace could not open. Please sign in again or contact support.";
   if (code === "AUTH_CONFIGURATION") return "Account access is temporarily unavailable. Please contact support.";
   if (action === "signup") return "Could not create your account right now. Please try again later or contact support.";
   if (action === "reset") return "Could not request a password reset right now. Please try again later or contact support.";

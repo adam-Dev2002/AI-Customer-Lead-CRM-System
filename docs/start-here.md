@@ -4,7 +4,7 @@ This is the place to start when you return. You do not need to set everything up
 
 **Handover: 22 October 2026; last hosted-setup checkpoint: 21 October.** The website is on Vercel and the CRM records are in Supabase. The combined n8n automation remains installed in Docker on the Windows computer. It processes inquiries only while Docker/n8n is running. Automation hosting remains unfinished.
 
-The new [private business accounts and hosting guide](business-accounts-and-hosting.md) describes the signup release and its rollout. The new Supabase migration, signup/confirmation settings, custom SMTP and verified Production deployment are still required; this handover does not claim external signup is already live. Each new business starts with separate records after rollout and needs its own automation connection.
+The new [private business accounts and hosting guide](business-accounts-and-hosting.md) describes immediate signup into a private workspace, without a confirmation email. Its Supabase migration, **Confirm Email off** policy and verified Production deployment are required; a code release does not change those platform settings. Signup needs no SMTP delivery; password recovery still uses email. Each new business starts with separate records and needs its own automation connection.
 
 ![The dashboard, shown with fictional customers](images/setup/dashboard.png)
 

@@ -6,6 +6,7 @@ import { safeReturnPath } from "@/lib/auth/config";
 import { sharedLimitResult } from "@/lib/auth/rate-limit";
 import { cloudConfiguration, cloudRPC } from "@/lib/crm/cloud-store";
 import { authFailureMessage, authProviderFailure, type AuthAction, type AuthFailureCode } from "@/lib/auth/failures";
+import { immediateSignupPolicy } from "@/lib/auth/signup-policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,6 +67,9 @@ export async function POST(request: NextRequest) {
       if (businessName.length < 2 || businessName.length > 100 || /[\u0000-\u001f\u007f]/.test(businessName)) return reply({ error: "Enter a business name with 2 to 100 characters." }, 400);
       if (typeof body.password !== "string" || body.password.length < 10 || body.password.length > 128) return reply({ error: "Use a password with 10 to 128 characters." }, 400);
       if (body.password !== body.confirmPassword) return reply({ error: "Your passwords do not match." }, 400);
+      phase = "signup-policy";
+      const policy = await immediateSignupPolicy();
+      if (policy !== "ready") return failure(action, policy === "confirmation-required" ? "AUTH_SIGNUP_POLICY" : policy === "disabled" ? "AUTH_SIGNUP_DISABLED" : "AUTH_CONFIGURATION", phase);
       phase = "workspace-setup";
       if (cloudConfiguration()) {
         try {
@@ -77,16 +81,24 @@ export async function POST(request: NextRequest) {
         } catch { return failure(action, "AUTH_WORKSPACE_SETUP", phase); }
       }
       phase = "signup-provider";
-      const result = await client.auth.signUp({ email, password: body.password, options: { data: { business_name: businessName }, emailRedirectTo: new URL("/auth/confirm?type=signup", request.headers.get("origin")!).href } });
-      // Registration never opens the CRM, including when email confirmation has
-      // accidentally been disabled in the project's provider configuration.
-      if (result.data?.session) await signOutLocally(client);
-      if (result.error && !["user_already_exists", "email_exists"].includes(result.error.code || "")) {
+      const result = await client.auth.signUp({ email, password: body.password, options: { data: { business_name: businessName } } });
+      if (result.error) {
+        if (["user_already_exists", "email_exists"].includes(result.error.code || "")) return reply({ error: "Could not create an account with these details. Try signing in or resetting your password." }, 400);
         const code = authProviderFailure(result.error);
         if (code !== "AUTH_UNAVAILABLE" || !result.error.status || result.error.status >= 500) return failure(action, code, phase);
         return reply({ error: "Could not create your account. Check your details or try again shortly." }, result.error.status && result.error.status < 500 ? 400 : 503);
       }
-      return reply({ ok: true, message: "Check your inbox for an account confirmation email. If you already have an account, sign in or reset your password. Your business workspace opens after you confirm your email and sign in." });
+      if (!result.data?.session || !result.data.user) {
+        await signOutLocally(client);
+        return failure(action, "AUTH_SIGNUP_POLICY", "signup-session");
+      }
+      phase = "signup-workspace";
+      const access = await workspaceAccess();
+      if (access.status !== "authorized" || access.user.id !== result.data.user.id) {
+        await signOutLocally(client);
+        return failure(action, "AUTH_WORKSPACE_UNAVAILABLE", phase);
+      }
+      return reply({ ok: true, next: safeReturnPath(body.next) });
     }
     if (body.action !== "login" || typeof body.password !== "string" || !body.password || body.password.length > 128) return reply({ error: "Enter your email and password." }, 400);
     phase = "login-provider";
@@ -96,7 +108,7 @@ export async function POST(request: NextRequest) {
     const access = await workspaceAccess();
     if (access.status !== "authorized") {
       await signOutLocally(client);
-      return reply({ error: access.status === "forbidden" ? "Confirm your email before opening your workspace. Contact support if you still need help." : "Workspace access could not be checked. Please try again." }, access.status === "forbidden" ? 403 : 503);
+      return reply({ error: access.status === "forbidden" ? "Your account cannot open this workspace yet. Please contact support." : "Workspace access could not be checked. Please try again." }, access.status === "forbidden" ? 403 : 503);
     }
     return reply({ ok: true, next: safeReturnPath(body.next) });
   } catch { return failure(action, "AUTH_UNAVAILABLE", phase); }

@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export function LoginForm({ configured, next, reason, brand }: { configured: boolean; next: string; reason?: string; brand: { businessName: string; businessLogo: string; generic?: boolean } }) {
   const [mode, setMode] = useState<"login" | "signup" | "reset">("login"), [visible, setVisible] = useState(false), [busy, setBusy] = useState(false);
   const reset = mode === "reset", signup = mode === "signup";
-  const [error, setError] = useState(reason === "access" ? "Confirm your email before opening your workspace. Contact support if you still need help." : reason === "link" ? "This link has expired or was already used. Sign in if you have confirmed your email, or request a new password reset link." : reason === "unavailable" ? "Workspace access could not be checked. Please try again shortly." : "");
+  const [error, setError] = useState(reason === "access" ? "Your account cannot open this workspace yet. Please contact support." : reason === "link" ? "This link has expired or was already used. Try signing in or request a new password reset link." : reason === "unavailable" ? "Workspace access could not be checked. Please try again shortly." : "");
   const [message, setMessage] = useState(reason === "confirmed" ? "Your email is confirmed. Sign in to open your business workspace." : "");
   function changeMode(value: "login" | "signup" | "reset") { setMode(value); setVisible(false); setError(""); setMessage(""); }
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -21,7 +21,7 @@ export function LoginForm({ configured, next, reason, brand }: { configured: boo
       const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: mode, businessName: form.get("businessName"), email: form.get("email"), password: form.get("password"), confirmPassword: form.get("confirmPassword"), next }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not sign in. Please try again.");
-      if (reset || signup) { setMessage(result.message); if (signup) formElement.reset(); }
+      if (reset) setMessage(result.message);
       else window.location.assign(result.next || "/");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not sign in."); }
     finally { setBusy(false); }
@@ -41,7 +41,7 @@ export function LoginForm({ configured, next, reason, brand }: { configured: boo
           <div className="mb-9 flex items-center gap-3 md:hidden"><BrandLogo logo={brand.businessLogo} generic={brand.generic} /><span className="text-sm font-semibold">{brand.businessName}</span></div>
           <span className="mb-5 inline-flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><LockKeyhole className="size-5" /></span>
           <h1 className="text-2xl font-semibold tracking-tight">{reset ? "Reset your password" : signup ? "Create your account" : "Welcome back"}</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{reset ? "We’ll email you a link to choose a new password." : signup ? "Start a private workspace for your business. Confirm your email before signing in." : "Sign in to open your customer workspace."}</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{reset ? "We’ll email you a link to choose a new password." : signup ? "Create your account to open a private workspace for your business." : "Sign in to open your customer workspace."}</p>
           {!configured && <p role="status" className="mt-6 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-sm leading-6">Sign-in is being set up. Please contact your workspace administrator.</p>}
           <form onSubmit={submit} className="mt-7 space-y-5">
             {signup && <div className="space-y-2"><label htmlFor="businessName" className="text-sm font-medium">Business name</label><Input id="businessName" name="businessName" autoComplete="organization" placeholder="Your business" required minLength={2} maxLength={100} disabled={busy || !configured} className="h-11" /></div>}
