@@ -10,7 +10,7 @@ const { PGlite } = createRequire(new URL('../../templates/leads/package.json', i
 
 export async function startTenantSupabase({ legacyData = createEmptyWorkspace('Existing ClearFlow'), signupEnabled = true } = {}) {
   const db = new PGlite(), secret = 'sb_secret_tenant_isolated_qa', objects = new Map();
-  const control = { unavailable: false, lostCommits: 0, commits: 0 }, calls = [];
+  const control = { unavailable: false, lostCommits: 0, commits: 0, missingRPCs: new Set() }, calls = [];
   let server, auth;
   const sql = (statement, params = []) => db.query(statement, params);
   const service = (expression, values = []) => db.transaction(async tx => {
@@ -81,7 +81,9 @@ export async function startTenantSupabase({ legacyData = createEmptyWorkspace('E
           return send([...entries.values()].sort((a, b) => a.name.localeCompare(b.name)).slice(input.offset, input.offset + input.limit));
         }
         if (!pathname.startsWith('/rest/v1/rpc/') || request.method !== 'POST') return send({}, 404);
-        const name = pathname.slice('/rest/v1/rpc/'.length), result = await rpc(name, body());
+        const name = pathname.slice('/rest/v1/rpc/'.length);
+        if (control.missingRPCs.has(name)) return send({ code: 'PGRST202' }, 404);
+        const result = await rpc(name, body());
         if (['crm_store_commit', 'crm_tenant_commit'].includes(name)) {
           control.commits++;
           if (control.lostCommits > 0) { control.lostCommits--; response.destroy(); return; }

@@ -12,10 +12,15 @@ export function consumeLimit(key: string, limit: number, windowMs: number, now =
   buckets.set(key, entry);
   return true;
 }
-export async function consumeSharedLimit(key: string, limit: number, windowMs: number) {
+export async function sharedLimitResult(key: string, limit: number, windowMs: number): Promise<"allowed" | "limited" | "unavailable"> {
   key = `${currentWorkspaceId() || "public"}:${key}`;
-  if (!cloudConfiguration()) return consumeLimit(key, limit, windowMs);
   try {
-    return await cloudRPC("crm_consume_limit", { p_key: createHash("sha256").update(key).digest("hex"), p_limit: limit, p_window_ms: windowMs }) === true;
-  } catch { return false; }
+    if (!cloudConfiguration()) return consumeLimit(key, limit, windowMs) ? "allowed" : "limited";
+    const result = await cloudRPC("crm_consume_limit", { p_key: createHash("sha256").update(key).digest("hex"), p_limit: limit, p_window_ms: windowMs });
+    return result === true ? "allowed" : result === false ? "limited" : "unavailable";
+  } catch { return "unavailable"; }
+}
+
+export async function consumeSharedLimit(key: string, limit: number, windowMs: number) {
+  return (await sharedLimitResult(key, limit, windowMs)) === "allowed";
 }

@@ -33,6 +33,42 @@ Code pushed to GitHub, a successful build, applied SQL and a verified live deplo
 
 ## Enable Supabase email signup
 
+### If Create account returns HTTP 503
+
+The application now returns a safe `code` and `requestId` with failures. Vercel
+Runtime Logs include that reference, action and phase, without passwords, email
+addresses or keys. A signup error must not be treated as successful account creation.
+
+1. Open the existing Vercel project's **Production deployment → Visit**, rather
+   than retaining a deployment-specific URL. The URL supplied during the 22 October
+   investigation was protected by Vercel sign-in, so its runtime logs/settings
+   could not be inspected from the public site.
+2. Check **Settings → Environment Variables → Production** for all five existing
+   values: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+   `CRM_STORAGE_BACKEND=supabase`, `SUPABASE_SECRET_KEY`, and `N8N_WEBHOOK_SECRET`.
+   Copy the matching private values locally; do not paste them into chat. Saving
+   `.env.local` on your PC does not update Vercel. Redeploy after changing variables.
+   Keep live secrets out of Preview environments. [Vercel environment changes](https://vercel.com/docs/environment-variables/managing-environment-variables)
+3. `AUTH_CONFIGURATION` means the Auth client or shared database limits are
+   unavailable. Check the phase in Runtime Logs and the Production environment
+   before retrying. This is distinct from `AUTH_RATE_LIMIT` (HTTP 429).
+4. `AUTH_WORKSPACE_SETUP` means the read-only workspace readiness check failed.
+   Apply the new private-workspace migration above and verify server database
+   access. A read-only check on 22 October found email signup and confirmation
+   enabled, but `crm_provision_workspace` was absent and the attempted signup
+   account had not been created. The release now checks workspace setup before
+   asking Supabase to create an account.
+5. `AUTH_EMAIL_SETUP` means confirmation/reset email delivery needs configuration;
+   use the SMTP steps below. `AUTH_SIGNUP_DISABLED` means signup is disabled at the
+   provider. `AUTH_UNAVAILABLE` covers temporary provider/network errors and has
+   action-specific wording. Do not disable email confirmation or insert a new
+   user into ClearFlow to work around these failures.
+
+After setup, make one registration attempt using your controlled address, confirm
+the email and sign in. Verify its workspace is empty and separate from ClearFlow.
+The automated failure checks use simulated email only; they do not establish that
+the live SMTP sender is configured or that a real confirmation email was delivered.
+
 Use the existing project's Supabase Dashboard. These are application logins, separate from GitHub, Vercel, Supabase Dashboard and n8n editor accounts.
 
 1. Open **Authentication → Sign In / Providers → Email**. Enable email/password sign-in and **Allow new users to sign up**. Leave **Confirm Email** on. Supabase's hosted email/password signup normally requires confirmation; disabling confirmation assumes an address is already verified. [Supabase configuration](https://supabase.com/docs/guides/auth/general-configuration), [password signup](https://supabase.com/docs/guides/auth/passwords)

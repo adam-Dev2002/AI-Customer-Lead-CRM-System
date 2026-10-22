@@ -38,6 +38,34 @@ try {
   for (const body of [{ ...signup, businessName: "Q" }, { ...signup, businessName: "QA\tBusiness" }, { ...signup, businessName: "x".repeat(101) }, { ...signup, password: "short", confirmPassword: "short" }, { ...signup, confirmPassword: "a-different-password" }]) assert.equal((await request(body)).status, 400);
   assert.equal((await request(signup, "https://outside.test")).status, 403);
   assert.equal((await fetch(base + "/api/crm")).status, 401);
+  const expectFailure = async (response, expected, text) => {
+    assert.equal(response.status, expected === "AUTH_RATE_LIMIT" ? 429 : expected === "AUTH_WEAK_PASSWORD" ? 400 : 503);
+    const body = await response.json(); assert.equal(body.code, expected); assert.match(body.error, text);
+    assert.match(body.requestId, /^[a-f0-9-]{36}$/);
+    assert(!JSON.stringify(body).includes("Simulated"), "raw provider diagnostics must not reach the browser");
+  };
+  const beforeFailures = supabase.accounts.length;
+  supabase.control.missingRPCs.add("crm_workspace_connection");
+  await expectFailure(await request({ ...signup, email: "setup-missing.qa@example.com" }), "AUTH_WORKSPACE_SETUP", /Account creation is being set up/);
+  supabase.control.missingRPCs.clear();
+  supabase.control.unavailable = true;
+  await expectFailure(await request({ ...signup, email: "storage-offline.qa@example.com" }), "AUTH_CONFIGURATION", /Account access is temporarily unavailable/);
+  supabase.control.unavailable = false;
+  for (const [code, status, expected, message] of [
+    ["email_address_not_authorized", 403, "AUTH_EMAIL_SETUP", /confirmation emails are not available/],
+    ["signup_disabled", 422, "AUTH_SIGNUP_DISABLED", /Account creation is being set up/],
+    ["over_email_send_rate_limit", 429, "AUTH_RATE_LIMIT", /Too many attempts/],
+    ["weak_password", 422, "AUTH_WEAK_PASSWORD", /stronger password/],
+    ["unexpected_failure", 500, "AUTH_UNAVAILABLE", /Could not create your account/],
+  ]) {
+    supabase.auth.control.signupFailure = { code, status };
+    await expectFailure(await request({ ...signup, email: `${code}.qa@example.com` }), expected, message);
+  }
+  supabase.auth.control.signupFailure = null;
+  supabase.auth.control.resetFailure = { code: "email_address_not_authorized", status: 403 };
+  await expectFailure(await request({ action: "reset", email: "reset-error.qa@example.com" }), "AUTH_EMAIL_SETUP", /Password reset emails are not available/);
+  supabase.auth.control.resetFailure = null;
+  assert.equal(supabase.accounts.length, beforeFailures, "failed setup/email requests must not create accounts");
 
   const fresh = { ...signup, email: "account.qa@example.com" };
   const registration = await request(fresh);

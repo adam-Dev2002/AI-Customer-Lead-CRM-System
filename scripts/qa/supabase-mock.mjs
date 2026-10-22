@@ -10,6 +10,7 @@ export async function startSupabaseMock(options = {}) {
   const password = "isolated-qa-password";
   const accounts = [owner, outsider, member], passwords = new Map(accounts.map(account => [account.email, password])), confirmations = new Map();
   let ownerAccess = true;
+  const control = { signupFailure: null, resetFailure: null };
   const userObject = user => ({ ...user, aud: "authenticated", role: "authenticated", email_confirmed_at: user.confirmed === false ? null : "2026-01-01T00:00:00Z", app_metadata: { provider: "email", providers: ["email"] }, user_metadata: user.user_metadata || {}, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" });
   async function confirmSignup(email) {
     const account = accounts.find(item => item.email === email);
@@ -27,12 +28,13 @@ export async function startSupabaseMock(options = {}) {
   const server = createServer(async (request, response) => {
     try {
     const url = new URL(request.url, "http://127.0.0.1");
-    const send = (body, status = 200) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
+    const send = (body, status = 200) => { response.writeHead(status, { "Content-Type": "application/json", "X-Supabase-Api-Version": "2024-01-01" }); response.end(JSON.stringify(body)); };
     if (request.headers.apikey !== key) return send({ message: "Invalid QA key" }, 401);
     const user = tokens.get(request.headers.authorization?.replace(/^Bearer /, ""));
     const readBody = async () => { let raw = ""; for await (const chunk of request) raw += chunk; return JSON.parse(raw || "{}"); };
     if (url.pathname === "/auth/v1/settings") return send({ external: { email: true }, disable_signup: !options.signupEnabled, mailer_autoconfirm: false });
     if (url.pathname === "/auth/v1/signup" && request.method === "POST") {
+      if (control.signupFailure) return send({ msg: "Simulated signup service failure", code: control.signupFailure.code }, control.signupFailure.status);
       if (!options.signupEnabled) return send({ msg: "Signups not allowed", code: "signup_disabled" }, 422);
       const body = await readBody();
       const existing = accounts.find(item => item.email === body.email);
@@ -60,7 +62,7 @@ export async function startSupabaseMock(options = {}) {
     }
     if (url.pathname === "/auth/v1/user") return user ? send(userObject(user)) : send({ msg: "Invalid token", code: 401 }, 401);
     if (url.pathname === "/auth/v1/logout") { tokens.delete(request.headers.authorization?.replace(/^Bearer /, "")); response.writeHead(204); return response.end(); }
-    if (url.pathname === "/auth/v1/recover") return send({});
+    if (url.pathname === "/auth/v1/recover") return control.resetFailure ? send({ msg: "Simulated reset email failure", code: control.resetFailure.code }, control.resetFailure.status) : send({});
     if (url.pathname === "/rest/v1/crm_workspace_members") {
       if (options.resolveMembership) return send(user && url.searchParams.get("user_id") === `eq.${user.id}` ? await options.resolveMembership(userObject(user)) : []);
       if (ownerAccess && user?.id === owner.id && url.searchParams.get("user_id") === `eq.${owner.id}`) return send([{ user_id: owner.id, workspace_id: "clearflow", role: "owner", display_name: "QA Owner" }]);
@@ -71,5 +73,5 @@ export async function startSupabaseMock(options = {}) {
     } catch { response.writeHead(500, { "Content-Type": "application/json" }); response.end(JSON.stringify({ message: "Isolated QA Auth failure" })); }
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-  return { url: `http://127.0.0.1:${server.address().port}`, key, owner, outsider, member, password, accounts, confirmationToken: email => [...confirmations].find(([, accountEmail]) => accountEmail === email)?.[0], confirmSignup, setOwnerAccess: value => { ownerAccess = value; }, close: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
+  return { url: `http://127.0.0.1:${server.address().port}`, key, owner, outsider, member, password, accounts, control, confirmationToken: email => [...confirmations].find(([, accountEmail]) => accountEmail === email)?.[0], confirmSignup, setOwnerAccess: value => { ownerAccess = value; }, close: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
 }
