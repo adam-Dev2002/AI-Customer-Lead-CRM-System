@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:cloud": "node --experimental-strip-types --test tests/cloud-storage.test.mjs",
-    "test": "node --experimental-strip-types --test tests/domain.test.mjs tests/csv.test.mjs tests/integration.test.mjs tests/mail.test.mjs tests/followups.test.mjs tests/form-followups.test.mjs tests/inquiry-growth.test.mjs tests/inquiry-form.test.mjs tests/record-sort.test.mjs tests/record-filter.test.mjs tests/inquiry-preview.test.mjs tests/workflow-wiring.test.mjs tests/unified-workflow.test.mjs tests/contact-photos.test.mjs tests/company-logos.test.mjs tests/assistant.test.mjs tests/business-logo.test.mjs tests/reports.test.mjs"
+    "test": "node --experimental-strip-types --test tests/domain.test.mjs tests/csv.test.mjs tests/integration.test.mjs tests/mail.test.mjs tests/followups.test.mjs tests/form-followups.test.mjs tests/inquiry-growth.test.mjs tests/inquiry-form.test.mjs tests/record-sort.test.mjs tests/record-filter.test.mjs tests/inquiry-preview.test.mjs tests/workflow-wiring.test.mjs tests/unified-workflow.test.mjs tests/contact-photos.test.mjs tests/company-logos.test.mjs tests/assistant.test.mjs tests/business-logo.test.mjs tests/reports.test.mjs tests/auth-config.test.mjs tests/new-workspace.test.mjs",
+    "test:tenants": "node --experimental-strip-types --test tests/tenant-storage.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -49,6 +50,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.11",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

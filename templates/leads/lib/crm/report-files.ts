@@ -20,7 +20,7 @@ export async function createReportFiles(data: CRMSnapshot, ids: unknown, label: 
   const report = leadReport(data, ids, label), id = randomUUID();
   const chart = await sharp(Buffer.from(reportChartSVG(report))).png().toBuffer();
   let logo = businessLogo(report.logo);
-  if (!logo) { try { logo = "data:image/png;base64," + (await readFile(path.join(process.cwd(), "public/brand/clearflow-plumbing.png"))).toString("base64"); } catch {} }
+  if (!logo && data.settings.brandPreset !== "generic") { try { logo = "data:image/png;base64," + (await readFile(path.join(process.cwd(), "public/brand/clearflow-plumbing.png"))).toString("base64"); } catch {} }
   const chartUrl = "data:image/png;base64," + chart.toString("base64");
   const html = reportHTML(report, chartUrl, logo);
   const browser = await launchReportBrowser();

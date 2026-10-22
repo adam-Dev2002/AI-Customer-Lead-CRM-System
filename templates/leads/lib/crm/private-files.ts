@@ -2,18 +2,27 @@ import { mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { cloudConfiguration, cloudRequest } from "./cloud-store.ts";
+import { currentWorkspaceId } from "./workspace-context.ts";
 
 export function privateFileKey(key: string) {
   if (/^config\/(assistant-gemini|google-contact-photos|customer-form)\.json$/.test(key) || /^reports\/[a-f0-9-]{36}\/(report\.(pdf|xlsx|json)|chart\.png|email\.html|mail(?:-[a-f0-9]{64})?\.mime)$/.test(key)) return key;
   throw new Error("Invalid private workspace file.");
 }
+export function privateFileStorageKey(key: string) {
+  const validated = privateFileKey(key), scope = currentWorkspaceId();
+  // Existing ClearFlow files retain their original names. Other businesses never
+  // read that namespace, including when their own file has not been configured.
+  return scope && scope !== "clearflow" ? `workspaces/${scope}/${validated}` : validated;
+}
 function localPath(key: string, directory?: string) {
   privateFileKey(key);
+  const scope = currentWorkspaceId();
+  if (scope && scope !== "clearflow") throw new Error("Private business files require cloud storage.");
   const root = directory || process.env.CRM_DATA_DIR || path.join(process.cwd(), ".data");
   // Local config predates the cloud bucket's config/ prefix.
   return path.join(/* turbopackIgnore: true */ root, key.startsWith("config/") ? key.slice(7) : key);
 }
-function objectPath(key: string) { return "/storage/v1/object/crm-private/" + privateFileKey(key).split("/").map(encodeURIComponent).join("/"); }
+function objectPath(key: string) { return "/storage/v1/object/crm-private/" + privateFileStorageKey(key).split("/").map(encodeURIComponent).join("/"); }
 export async function readPrivateFile(key: string, localDirectory?: string): Promise<Buffer> {
   if (!cloudConfiguration()) return readFile(/* turbopackIgnore: true */ localPath(key, localDirectory));
   const response = await cloudRequest(objectPath(key));
@@ -46,6 +55,6 @@ export async function writePrivateFile(key: string, bytes: Buffer | string) {
 export async function removePrivateFiles(keys: string[]) {
   keys.forEach(privateFileKey);
   if (!cloudConfiguration()) { await Promise.all(keys.map(key => rm(localPath(key), { force: true }))); return; }
-  const response = await cloudRequest("/storage/v1/object/crm-private", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: keys }) });
+  const response = await cloudRequest("/storage/v1/object/crm-private", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: keys.map(privateFileStorageKey) }) });
   if (!response.ok) throw new Error("Temporary cloud report files could not be removed.");
 }

@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import type { CRMData } from "./types.ts";
+import { currentWorkspaceId } from "./workspace-context.ts";
 
 export function cloudConfiguration(env: NodeJS.ProcessEnv = process.env) {
   const backend = env.CRM_STORAGE_BACKEND || "local";
@@ -40,16 +41,16 @@ export async function cloudRPC(name: string, body: Record<string, unknown> = {})
   return response.json();
 }
 
-type Transaction = { data: CRMData; dirty: boolean };
+type Transaction = { data: CRMData; dirty: boolean; workspaceId?: string };
 const transaction = new AsyncLocalStorage<Transaction>();
 export function cloudWorkspace() {
   const context = transaction.getStore();
-  if (!context) throw new Error("Cloud workspace reads require a transaction.");
+  if (!context || context.workspaceId !== currentWorkspaceId()) throw new Error("Cloud workspace reads require an authorized transaction.");
   return context.data;
 }
 export function stageCloudWorkspace(data: CRMData) {
   const context = transaction.getStore();
-  if (!context) throw new Error("Cloud workspace writes require a transaction.");
+  if (!context || context.workspaceId !== currentWorkspaceId()) throw new Error("Cloud workspace writes require an authorized transaction.");
   context.data = data; context.dirty = true;
 }
 
@@ -57,18 +58,25 @@ export function stageCloudWorkspace(data: CRMData) {
 // A conflict recomputes against the latest state. Uncertain HTTP retries reuse the
 // same commit receipt, so a committed mutation cannot be applied twice.
 export async function cloudTransaction<T>(work: () => Promise<T>): Promise<T> {
-  if (!cloudConfiguration()) return work();
+  const scope = currentWorkspaceId();
+  const tenant = scope && scope !== "clearflow" ? scope : undefined;
+  if (!cloudConfiguration()) {
+    if (scope && scope !== "clearflow") throw new Error("Private business workspaces require cloud storage.");
+    return work();
+  }
   for (let attempt = 0; attempt < 12; attempt++) {
-    const stored = await cloudRPC("crm_store_read");
+    // Unscoped calls exist only for the original ClearFlow maintenance scripts.
+    // Authenticated requests always supply their verified workspace explicitly.
+    const stored = await cloudRPC(tenant ? "crm_tenant_read" : "crm_store_read", tenant ? { p_workspace_id: tenant } : {});
     if (!Number.isSafeInteger(stored.revision) || stored.data?.version !== 1) throw new Error("Import the existing CRM workspace before starting cloud storage.");
-    const context: Transaction = { data: stored.data, dirty: false };
+    const context: Transaction = { data: stored.data, dirty: false, workspaceId: scope };
     const result = await transaction.run(context, work);
     if (!context.dirty) return result;
-    const input = { p_revision: stored.revision, p_data: context.data, p_request_id: randomUUID() };
+    const input = { p_revision: stored.revision, p_data: context.data, p_request_id: randomUUID(), ...(tenant ? { p_workspace_id: tenant } : {}) };
     let committed;
     // Retry the exact request, including its receipt ID, after a lost/invalid response.
     for (let retry = 0; retry < 3; retry++) {
-      try { committed = await cloudRPC("crm_store_commit", input); break; }
+      try { committed = await cloudRPC(tenant ? "crm_tenant_commit" : "crm_store_commit", input); break; }
       catch { if (retry === 2) throw new Error("The cloud save could not be confirmed. Refresh before trying the action again."); }
     }
     if (committed?.applied === true) return result;

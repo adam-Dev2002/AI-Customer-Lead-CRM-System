@@ -2,6 +2,7 @@
 .env*
 !.env.example
 .next-qa
+.next-*
 tests
 *.tsbuildinfo
 *.log

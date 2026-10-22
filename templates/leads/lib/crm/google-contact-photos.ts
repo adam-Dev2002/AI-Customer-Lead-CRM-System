@@ -1,5 +1,6 @@
 import { contactEmail, safePhotoUrl } from "./contact-photos.ts";
 import { readPrivateFile } from "./private-files.ts";
+import { currentWorkspaceId } from "./workspace-context.ts";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
@@ -119,7 +120,7 @@ export function createGoogleContactPhotoReader(
 
 type PhotoConfiguration = { clientId: string; clientSecret: string; refreshToken: string; accountEmail?: string };
 export async function photoConfiguration(env: Record<string, string | undefined> = process.env): Promise<PhotoConfiguration | null> {
-  if (env.GOOGLE_CONTACTS_CLIENT_ID && env.GOOGLE_CONTACTS_CLIENT_SECRET && env.GOOGLE_CONTACTS_REFRESH_TOKEN)
+  if ((!currentWorkspaceId() || currentWorkspaceId() === "clearflow") && env.GOOGLE_CONTACTS_CLIENT_ID && env.GOOGLE_CONTACTS_CLIENT_SECRET && env.GOOGLE_CONTACTS_REFRESH_TOKEN)
     return { clientId: env.GOOGLE_CONTACTS_CLIENT_ID, clientSecret: env.GOOGLE_CONTACTS_CLIENT_SECRET, refreshToken: env.GOOGLE_CONTACTS_REFRESH_TOKEN };
   const directory = env.CRM_DATA_DIR || path.join(process.cwd(), ".data");
   try {
@@ -137,8 +138,9 @@ export async function readGoogleContactPhotos(emails: string[], expectedAccount 
   if (!config) return { status: "not_configured", photos: {} };
   if (config.accountEmail && expectedAccount && contactEmail(config.accountEmail) !== contactEmail(expectedAccount))
     return { status: "unavailable", photos: {} };
-  const signature = createHash("sha256").update(JSON.stringify(config)).digest("hex");
+  const signature = createHash("sha256").update(`${currentWorkspaceId() || "clearflow"}:${JSON.stringify(config)}`).digest("hex");
   if (runtime.__googleContactPhotosV2?.signature !== signature)
     runtime.__googleContactPhotosV2 = { signature, reader: createGoogleContactPhotoReader({ GOOGLE_CONTACTS_CLIENT_ID: config.clientId, GOOGLE_CONTACTS_CLIENT_SECRET: config.clientSecret, GOOGLE_CONTACTS_REFRESH_TOKEN: config.refreshToken }) };
-  return runtime.__googleContactPhotosV2.reader(emails);
+  const reader = runtime.__googleContactPhotosV2.reader;
+  return reader(emails);
 }

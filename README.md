@@ -15,6 +15,12 @@ Returning to the project? Read [Welcome back](docs/start-here.md) for the curren
 checkpoint and what remains. The website and Supabase are set up; hosting the
 local n8n automation is still pending.
 
+The [business accounts and hosting handover](docs/business-accounts-and-hosting.md)
+covers the new private-business signup release. Production rollout still needs
+the Supabase workspace migration, signup/confirmation email configuration and
+deployment verification. New businesses need their own automation connections;
+creating an account does not connect Gmail.
+
 The [illustrated setup guide](docs/setup-combined-workflow.md) follows the selected
 **128-node combined Gemini workflow**, with fictional customers, seven dashboard
 pictures, Sheet headers and an inactive workflow example with account bindings
@@ -66,7 +72,10 @@ Supabase hosts authentication, CRM storage and private files. Host the existing
 n8n automation separately; Vercel does not run its background schedules.
 
 Follow the [setup and hosting guide](docs/setup-combined-workflow.md).
-Publishing source code does not deploy the application or activate workflows.
+A push can trigger Vercel deployment when Git integration is enabled; it does
+not apply Supabase migrations, configure confirmation email or activate n8n.
+For a commercial service, check the current hosting terms: Vercel Hobby permits
+personal, non-commercial use only. [Official plan rules](https://vercel.com/docs/plans/hobby)
 
 ## Verification
 
@@ -74,9 +83,13 @@ From `templates/leads`:
 
 ```sh
 pnpm test
+pnpm test:tenants
 pnpm exec tsc --noEmit
 pnpm build
 ```
+
+`test:tenants` runs the private-workspace SQL and file-isolation checks in an
+embedded PostgreSQL instance. It requires no Docker or live Supabase credentials.
 
 The workflow wiring and unified workflow tests require the privately retained,
 reviewed n8n exports described in `scripts/n8n/source-reference.json` and

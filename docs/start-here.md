@@ -2,7 +2,9 @@
 
 This is the place to start when you return. You do not need to set everything up again.
 
-**Checkpoint: 21 October 2026.** The website is on Vercel and the CRM records are in Supabase. The combined n8n automation still runs in Docker on the Windows computer. Hosting that automation is the unfinished part.
+**Handover: 22 October 2026; last hosted-setup checkpoint: 21 October.** The website is on Vercel and the CRM records are in Supabase. The combined n8n automation remains installed in Docker on the Windows computer. It processes inquiries only while Docker/n8n is running. Automation hosting remains unfinished.
+
+The new [private business accounts and hosting guide](business-accounts-and-hosting.md) describes the signup release and its rollout. The new Supabase migration, signup/confirmation settings, custom SMTP and verified Production deployment are still required; this handover does not claim external signup is already live. Each new business starts with separate records after rollout and needs its own automation connection.
 
 ![The dashboard, shown with fictional customers](images/setup/dashboard.png)
 
@@ -14,6 +16,7 @@ This is the place to start when you return. You do not need to set everything up
 | --- | --- |
 | Website | Deployed to Vercel. Use **Visit** on the existing project's Production deployment. |
 | Login and CRM storage | Supabase is connected. Keep the existing project, accounts and private environment values. |
+| Private business signup | Code prepared; database migration, confirmation delivery and Production verification pending. See the [rollout steps](business-accounts-and-hosting.md#apply-the-account-release-safely). |
 | Automation | The selected combined export has **128 nodes**, uses Gemini, and was exported as active. It is still a local n8n installation. |
 | Customer form | The existing saved address points to local n8n. A public customer link needs the automation's future HTTPS address. |
 | Automation host | Not deployed. Northflank asked this account for a payment card, so that route stopped. |
@@ -31,7 +34,8 @@ A published website does not keep local n8n running. When the PC is off, the web
   Open `http://localhost:3001` for the local dashboard and `http://localhost:5678` for n8n. Check **How it works** for recent activity. An unchanged inbox may simply be waiting for the next scan.
 
 - **I want to understand or recreate the setup:** follow the [illustrated setup guide](setup-combined-workflow.md). Use a separate practice workspace for the dummy examples.
-- **I am ready to host n8n:** start at [the hosting handover](setup-combined-workflow.md#7-when-you-are-ready-to-host-the-automation). Choose the host then; none is assumed to be available or free forever.
+- **I want separate business accounts:** follow the [new account rollout](business-accounts-and-hosting.md). Keep the existing ClearFlow records and prepare a separate connection for each business.
+- **I am ready to host n8n:** [check ClawCloud's conditional free-credit route](business-accounts-and-hosting.md#next-step-check-clawcloud-without-moving-existing-data), then follow the [migration order](business-accounts-and-hosting.md#move-the-existing-automation-after-a-host-is-selected). The GitHub age prerequisite is met; actual hosting eligibility and continuous workload cost remain unverified.
 
 ## Which workflow file should I use?
 

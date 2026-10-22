@@ -15,7 +15,12 @@ export function supabaseConfiguration() {
 }
 
 export function safeReturnPath(value: unknown) {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || /[\\\r\n]/.test(value)) return "/";
-  if (value.startsWith("/auth") || value.startsWith("/login") || value.startsWith("/api")) return "/";
-  return value.slice(0, 1000);
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(value)) return "/";
+  try {
+    // URL parsing normalizes dot segments and control characters before a browser
+    // navigates. Check the normalized destination, including its origin.
+    const parsed = new URL(value.slice(0, 1000), "https://workspace.invalid");
+    if (parsed.origin !== "https://workspace.invalid" || ["/auth", "/login", "/api"].some(path => parsed.pathname.startsWith(path))) return "/";
+    return parsed.pathname + parsed.search + parsed.hash;
+  } catch { return "/"; }
 }

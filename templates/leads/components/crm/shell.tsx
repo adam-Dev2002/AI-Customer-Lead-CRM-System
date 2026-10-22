@@ -62,7 +62,7 @@ function Navigation({ signedInUser }: { signedInUser: SignedInUser }) {
           onClick={() => setOpenMobile(false)}
           className="group flex min-w-0 items-center gap-3 rounded-lg p-2 transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <BrandLogo logo={data.settings.businessLogo} />
+          <BrandLogo logo={data.settings.businessLogo} generic={data.settings.brandPreset === "generic"} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold">
               {data.settings.businessName}

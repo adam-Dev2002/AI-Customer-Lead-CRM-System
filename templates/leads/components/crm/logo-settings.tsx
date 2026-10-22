@@ -41,10 +41,10 @@ export function LogoSettings({ canManage }: { canManage: boolean }) {
   return <Panel title="Business logo" icon={ImageIcon} tone="violet">
     <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start">
       <div data-logo-preview className="flex size-24 shrink-0 items-center justify-center rounded-2xl border bg-white p-3 shadow-sm">
-        {selection ? <Image src={selection.preview} alt="Selected business logo preview" width={72} height={72} unoptimized className="size-full object-contain" /> : <BrandLogo logo={custom} className="size-full rounded-none ring-0" />}
+        {selection ? <Image src={selection.preview} alt="Selected business logo preview" width={72} height={72} unoptimized className="size-full object-contain" /> : <BrandLogo logo={custom} generic={data.settings.brandPreset === "generic"} className="size-full rounded-none ring-0" />}
       </div>
       <div className="min-w-0 flex-1 space-y-3">
-        <div><h2 className="text-sm font-medium">Make this workspace yours</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">Your logo appears in navigation, on the sign-in page and in the browser tab. PNG, JPG or WebP, up to 2 MB. A square image works best.</p></div>
+        <div><h2 className="text-sm font-medium">Make this workspace yours</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">Your logo appears in navigation and in the browser tab after sign-in. PNG, JPG or WebP, up to 2 MB. A square image works best.</p></div>
         {canManage ? <>
           <input ref={input} type="file" accept={logoContentTypes.join(",")} aria-label="Upload business logo" className="sr-only" onChange={choose} disabled={saving} />
           <div className="flex flex-wrap gap-2">

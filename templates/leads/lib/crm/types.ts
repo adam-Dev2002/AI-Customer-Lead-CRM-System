@@ -112,6 +112,7 @@ export interface Activity {
   workflow?: string;
 }
 export interface Settings {
+  brandPreset?: "clearflow" | "generic";
   businessName: string;
   businessLogo?: string;
   ownerName: string;

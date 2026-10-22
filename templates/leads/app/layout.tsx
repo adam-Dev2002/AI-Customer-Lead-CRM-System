@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description:
       "Customer inquiries, reply reviews, and follow-ups in one workspace.",
     icons: {
-      icon: [{ url: brand.businessLogo || defaultBusinessLogo, type: brand.businessLogo ? "image/webp" : "image/png" }],
+      icon: [{ url: brand.businessLogo || (brand.generic ? "/brand/customerlead.svg" : defaultBusinessLogo), type: brand.businessLogo ? "image/webp" : brand.generic ? "image/svg+xml" : "image/png" }],
     },
   };
 }

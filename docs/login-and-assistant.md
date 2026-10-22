@@ -1,5 +1,12 @@
 # ClearFlow sign-in and Gemini assistant
 
+**22 October 2026 update:** the private-business signup release supersedes this
+guide's original invitation-only setup. Follow [business accounts and hosting](business-accounts-and-hosting.md)
+for the new migration, email confirmation/SMTP settings and deployment checks.
+Those live rollout steps remain pending. The original owner and deliberately
+invited ClearFlow staff keep their existing workspace; new public accounts get
+their own empty business after the release is applied. Signup does not connect Gmail.
+
 The app now uses your Supabase project at `https://ygxpxmntcjhmjxfzuaqt.supabase.co`.
 Supabase Auth stores login identities, password hashes and sessions. The app has
 the project's **public publishable key** for browser login. The CRM storage
@@ -8,7 +15,11 @@ never belongs in browser code. With `CRM_STORAGE_BACKEND=supabase`, existing CRM
 records and private files live in Supabase. See
 [the current deployment guide](vercel-supabase-n8n-personal-guide.md).
 
-## Finish the Supabase setup
+## Original ClearFlow setup reference
+
+The following records the earlier single-business setup. Preserve an existing
+owner and applied migrations; use the new guide for signup rollout instead of
+recreating accounts or replacing records.
 
 1. Open [this project's SQL editor](https://supabase.com/dashboard/project/ygxpxmntcjhmjxfzuaqt/sql/new).
    Open `supabase/migrations/202610200001_crm_workspace_access.sql` in VS Code,
@@ -21,9 +32,10 @@ records and private files live in Supabase. See
 3. In the SQL editor, run the complete `supabase/grant-owner-access.sql` file.
    Expect **one returned row**. Zero rows means you must create the user in step 2.
    This grants that user access to the existing shared ClearFlow workspace.
-4. Under **Authentication → Sign In / Providers → Email**, disable **Allow new
-   users to sign up** for this invitation-only CRM. Even if signups are enabled,
-   an account without an admin-created membership cannot read the CRM.
+4. The original deployment used invitation-only access. The new private-business
+   release needs **Allow new users to sign up** enabled, **Confirm Email** retained,
+   and working custom SMTP, after its database migration and deployment checks.
+   See the [current signup instructions](business-accounts-and-hosting.md#enable-supabase-email-signup).
 5. Under **Authentication → URL Configuration**, set the local site URL to
    `http://127.0.0.1:3001`. Add these redirect URLs:
 
@@ -47,6 +59,10 @@ the app if Next.js has not reloaded the environment:
 ```
 
 ## Password resets and inviting more people
+
+The invitation steps below are for staff intentionally joining the existing
+ClearFlow team. Do not use that shared membership for an unrelated business.
+New business owners should use the separate signup flow after rollout.
 
 The login page has **Forgot your password?**. For reliable server-side recovery,
 open **Authentication → Email Templates → Reset Password** and use this link in
@@ -73,12 +89,16 @@ on conflict (user_id) do nothing
 returning user_id;
 ```
 
-To revoke access, delete only their row from `public.crm_workspace_members` in
-the Supabase dashboard. Access is checked on every server request. Sign out and
+To revoke ClearFlow team access, remove their ClearFlow membership row from
+`public.crm_workspace_members` in the Supabase dashboard. After the private-business
+release, that account can receive its own new empty business on a later sign-in;
+it must no longer see ClearFlow's records. Access is checked on every server request. Sign out and
 sign back in after changing accounts. Owners can upload or restore the business
 logo in Settings; members can view the logo. Both roles have the existing CRM
 record/reply/settings privileges. This
-deployment is **one shared workspace**, not separate data per customer/company.
+invitation puts staff in **one shared ClearFlow workspace**. Public signup in the
+new release provisions a separate business workspace; it does not invite the
+account into ClearFlow. The SQL above leaves an existing membership unchanged.
 
 ## What the assistant knows
 

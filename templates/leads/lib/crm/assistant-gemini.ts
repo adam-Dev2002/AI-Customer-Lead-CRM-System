@@ -1,19 +1,21 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { readPrivateFile } from "./private-files.ts";
+import { currentWorkspaceId } from "./workspace-context.ts";
 import { assistantInstruction, validatedAssistantAnswer, type AssistantSource } from "./assistant-context.ts";
 
 type Config = { apiKey: string; model: string };
 export async function assistantConfiguration(): Promise<Config | null> {
   try {
+    const legacy = !currentWorkspaceId() || currentWorkspaceId() === "clearflow";
     let stored: Partial<Config> = {};
-    if (!process.env.GEMINI_ASSISTANT_API_KEY) {
+    if (!legacy || !process.env.GEMINI_ASSISTANT_API_KEY) {
       const directory = process.env.CRM_DATA_DIR || path.join(process.cwd(), ".data");
       const filename = process.env.GEMINI_ASSISTANT_CONFIG_FILE || path.join(/* turbopackIgnore: true */ directory, "assistant-gemini.json");
-      stored = JSON.parse(process.env.GEMINI_ASSISTANT_CONFIG_FILE ? await readFile(/* turbopackIgnore: true */ filename, "utf8") : (await readPrivateFile("config/assistant-gemini.json")).toString("utf8"));
+      stored = JSON.parse(legacy && process.env.GEMINI_ASSISTANT_CONFIG_FILE ? await readFile(/* turbopackIgnore: true */ filename, "utf8") : (await readPrivateFile("config/assistant-gemini.json")).toString("utf8"));
     }
-    const apiKey = process.env.GEMINI_ASSISTANT_API_KEY || stored.apiKey;
-    const model = process.env.GEMINI_ASSISTANT_MODEL || stored.model;
+    const apiKey = (legacy && process.env.GEMINI_ASSISTANT_API_KEY) || stored.apiKey;
+    const model = (legacy && process.env.GEMINI_ASSISTANT_MODEL) || stored.model;
     if (!apiKey || !model || !/^[a-z0-9.-]+$/.test(model)) return null;
     return { apiKey, model };
   } catch { return null; }

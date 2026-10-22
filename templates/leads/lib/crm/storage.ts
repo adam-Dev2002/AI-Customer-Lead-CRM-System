@@ -12,12 +12,14 @@ import { businessLogo } from "./business-logo.ts";
 import { queueReportDelivery, type ReportDeliveryInput } from "./report-mail.ts";
 import type { ReportMeta } from "./report-model";
 import { cloudConfiguration, cloudWorkspace, stageCloudWorkspace, cloudTransaction } from "./cloud-store.ts";
+import { currentWorkspaceId } from "./workspace-context.ts";
 
 const directory = process.env.CRM_DATA_DIR || path.join(process.cwd(), ".data");
 // Workspace records are runtime data, never application build assets.
 const filename = path.join(/* turbopackIgnore: true */ directory, "crm.json");
 const runtime = globalThis as typeof globalThis & {
   __crmQueue?: Promise<unknown>;
+  __crmWorkspaceQueues?: Map<string, Promise<unknown>>;
 };
 async function load(): Promise<CRMData> {
   try {
@@ -76,8 +78,12 @@ async function save(data: CRMData) {
 }
 function serialized<T>(work: () => Promise<T>): Promise<T> {
   const run = () => cloudTransaction(work);
-  const pending = (runtime.__crmQueue || Promise.resolve()).then(run, run);
-  runtime.__crmQueue = pending.catch(() => undefined);
+  const id = currentWorkspaceId() || "clearflow";
+  const queues = runtime.__crmWorkspaceQueues ??= new Map();
+  const pending = (queues.get(id) || Promise.resolve()).then(run, run);
+  const settled = pending.then(() => undefined, () => undefined);
+  queues.set(id, settled);
+  void settled.then(() => { if (queues.get(id) === settled) queues.delete(id); });
   return pending;
 }
 function snapshot(data: CRMData): CRMSnapshot {
@@ -85,7 +91,7 @@ function snapshot(data: CRMData): CRMSnapshot {
     ...data,
     connection: {
       mode: cloudConfiguration() ? "supabase" : "local",
-      webhookReady: !!process.env.N8N_WEBHOOK_SECRET,
+      webhookReady: (!currentWorkspaceId() || currentWorkspaceId() === "clearflow") ? !!process.env.N8N_WEBHOOK_SECRET : !!(data.lastConfigReadAt || data.lastMailPollAt || data.lastSyncPollAt),
       lastEventAt: data.lastAutomationEventAt,
       lastPollAt: data.lastSyncPollAt,
       lastConfigReadAt: data.lastConfigReadAt,
