@@ -78,7 +78,7 @@ export function ConnectionsPage() {
           {ready && <p className="text-sm leading-6 text-muted-foreground">Review your <Link className="text-primary underline underline-offset-4" href="/settings">business details and reply preferences</Link> before enabling processing. AI suggestions and automatic emails follow those preferences.</p>}
           {lastPoll && <p className="text-xs text-muted-foreground">Last background check received: {new Date(lastPoll).toLocaleString()}. Enabled processing still needs an available connection.</p>}
           {status?.phase === 'active' && !status.managed && !lastPoll && <p role="status" className="text-xs text-muted-foreground">Waiting for the first background check.</p>}
-          <p className="border-t pt-4 text-xs leading-6 text-muted-foreground">Connecting your account and checking setup sends no customer email. You can keep automatic emails off in Settings while testing. Only your business owner can change this connection.</p>
+          <p className="border-t pt-4 text-xs leading-6 text-muted-foreground">Connecting your account and checking setup sends no customer email. You can keep automatic emails off in Settings while testing. Only your business owner can change this connection. <Link href="/privacy#google-access" className="text-primary underline underline-offset-4">Read how Google access and your data are used.</Link></p>
         </div>
       </Panel>
       <Panel title="Connection setup" icon={ShieldCheck}><ol className="space-y-5 p-5 sm:p-6">{milestones.map((step, index) => {

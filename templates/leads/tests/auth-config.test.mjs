@@ -2,6 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { safeReturnPath } from "../lib/auth/config.ts";
 import { customerPageRedirect, customerSiteOrigin } from "../lib/auth/customer-site.ts";
+import { isPublicInformationPage, publicSiteConfiguration } from "../lib/public-site.ts";
+
+test("only the three exact product information pages bypass workspace access", () => {
+  for (const path of ['/about', '/privacy', '/terms']) assert.equal(isPublicInformationPage(path), true);
+  for (const path of ['/', '/inbox', '/settings', '/connections', '/api/crm', '/privacy/private', '/about-workspace', '/terms/admin', '/auth/callback']) assert.equal(isPublicInformationPage(path), false, path);
+});
+
+test("public operator contact is explicit and never falls back to private account configuration", () => {
+  const draft = publicSiteConfiguration({ CRM_GOOGLE_CLIENT_ID: 'private-client', CRM_GOOGLE_CLIENT_SECRET: 'private-secret', OWNER_EMAIL: 'private.owner@example.com', CRM_PUBLIC_SUPPORT_EMAIL: 'help@example.com?bcc=outside@example.com' });
+  assert.equal(draft.operatorName, ''); assert.equal(draft.supportEmail, ''); assert.equal(draft.contactComplete, false);
+  assert.doesNotMatch(JSON.stringify(draft), /private-client|private-secret|private.owner/);
+  const configured = publicSiteConfiguration({ CRM_PUBLIC_OPERATOR_NAME: 'QA Operator', CRM_PUBLIC_SUPPORT_EMAIL: ' support@example.com ' });
+  assert.equal(configured.operatorName, 'QA Operator'); assert.equal(configured.supportEmail, 'support@example.com'); assert.equal(configured.contactComplete, true);
+  for (const email of ['bad\n@example.com', 'https://example.com', 'owner@example.com\r\nBcc:outside@example.com', '" onclick="alert(1)@example.com']) assert.equal(publicSiteConfiguration({ CRM_PUBLIC_SUPPORT_EMAIL: email }).supportEmail, '');
+});
 
 test("previous public login addresses redirect to the selected CRM with path and query preserved", () => {
   for (const host of ['ai-customer-lead-crm-system.vercel.app', 'ai-customer-lead-crm-system-1hmk.vercel.app']) {

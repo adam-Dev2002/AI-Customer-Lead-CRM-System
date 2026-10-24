@@ -2,7 +2,19 @@ import { cache } from "react";
 import { workspaceSnapshot } from "./server-snapshot";
 import { workspaceAccess } from "../auth/server";
 import { withWorkspace } from "./workspace-context";
-import { businessLogo } from "./business-logo";
+import { businessLogo, defaultBusinessLogo } from "./business-logo";
+import type { Metadata } from "next";
+
+export async function workspaceBrandMetadata(): Promise<Metadata> {
+  const brand = await publicBranding();
+  return {
+    title: `${brand.businessName} — Support & CRM`,
+    description: "Customer inquiries, reply reviews, and follow-ups in one workspace.",
+    icons: {
+      icon: [{ url: brand.businessLogo || (brand.generic ? "/brand/customerlead.svg" : defaultBusinessLogo), type: brand.businessLogo ? "image/webp" : brand.generic ? "image/svg+xml" : "image/png" }],
+    },
+  };
+}
 
 // A shared login page cannot identify a business by an unverified email address.
 export const publicBranding = cache(async () => {

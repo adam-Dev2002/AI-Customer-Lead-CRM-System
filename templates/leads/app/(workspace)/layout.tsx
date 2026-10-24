@@ -4,8 +4,10 @@ import { CRMProvider } from "@/components/crm/provider";
 import { CRMShell } from "@/components/crm/shell";
 import { workspaceSnapshot } from "@/lib/crm/server-snapshot";
 import { withWorkspace } from "@/lib/crm/workspace-context";
+import { workspaceBrandMetadata } from "@/lib/crm/public-branding";
 
 export const dynamic = "force-dynamic";
+export const generateMetadata = workspaceBrandMetadata;
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const access = await workspaceAccess();
   if (access.status !== "authorized") redirect(`/login?reason=${access.status === "forbidden" ? "access" : access.status === "unavailable" ? "unavailable" : "signin"}`);

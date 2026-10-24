@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseConfiguration } from "@/lib/auth/config";
 import { customerPageRedirect } from "@/lib/auth/customer-site";
+import { isPublicInformationPage } from "@/lib/public-site";
 
 export async function proxy(request: NextRequest) {
   const customerURL = customerPageRedirect(request.nextUrl, request.headers.get("host"), request.method);
@@ -10,6 +11,9 @@ export async function proxy(request: NextRequest) {
     redirect.headers.set("Cache-Control", "private, no-store");
     return redirect;
   }
+  // Public product/policy pages do not read a session or any workspace data.
+  // They remain available when the authentication provider is unavailable.
+  if (isPublicInformationPage(request.nextUrl.pathname)) return NextResponse.next();
   let response = NextResponse.next({ request });
   const config = supabaseConfiguration();
   const publicPage = request.nextUrl.pathname === "/login" || request.nextUrl.pathname.startsWith("/auth/");

@@ -6,6 +6,7 @@ import { ActionIcon } from "@/components/crm/action-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PublicLinks } from "@/components/public/public-links";
 
 export function LoginForm({ configured, next, reason, brand }: { configured: boolean; next: string; reason?: string; brand: { businessName: string; businessLogo: string; generic?: boolean } }) {
   const [mode, setMode] = useState<"login" | "signup" | "reset">("login"), [visible, setVisible] = useState(false), [busy, setBusy] = useState(false);
@@ -58,6 +59,7 @@ export function LoginForm({ configured, next, reason, brand }: { configured: boo
           </div>
           <p className="mt-10 border-t pt-5 text-xs leading-5 text-muted-foreground">Each business has its own private workspace. Email delivery and automation need to be connected for that business before use.</p>
           <p className="mt-4 flex items-center gap-1.5 text-[11px] text-muted-foreground"><Sparkles className="size-3" /> Your assistant is available after sign-in.</p>
+          <PublicLinks className="mt-5 border-t pt-5" />
         </section>
       </div>
     </main>

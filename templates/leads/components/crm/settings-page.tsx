@@ -24,6 +24,7 @@ import { defaultReportRecipient, readReportEmailPreferences } from "@/lib/crm/em
 import { normalizeEmail } from "@/lib/crm/email-address";
 import { InquiryFormSettings } from "./inquiry-form-settings";
 import type { InquiryFormLink } from "@/lib/crm/inquiry-form";
+import { PublicLinks } from "@/components/public/public-links";
 
 export function SettingsPage({ canManageLogo = false, customerForm = null, accountEmail = "" }: { canManageLogo?: boolean; customerForm?: InquiryFormLink | null; accountEmail?: string }) {
   const { data, run, busy } = useCRM(),
@@ -340,6 +341,7 @@ export function SettingsPage({ canManageLogo = false, customerForm = null, accou
           </div>
         </div>
       </Panel>
+      <PublicLinks className="border-t pt-5" />
       <Confirm
         open={clear}
         onOpenChange={setClear}

@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { publicBranding } from "@/lib/crm/public-branding";
-import { defaultBusinessLogo } from "@/lib/crm/business-logo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,17 +13,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export async function generateMetadata(): Promise<Metadata> {
-  const brand = await publicBranding();
-  return {
-    title: `${brand.businessName} — Support & CRM`,
-    description:
-      "Customer inquiries, reply reviews, and follow-ups in one workspace.",
-    icons: {
-      icon: [{ url: brand.businessLogo || (brand.generic ? "/brand/customerlead.svg" : defaultBusinessLogo), type: brand.businessLogo ? "image/webp" : brand.generic ? "image/svg+xml" : "image/png" }],
-    },
-  };
-}
+// Workspace-aware branding belongs to authenticated layouts and the login page.
+// Public information pages must not load a visitor's private workspace snapshot.
+export const metadata: Metadata = {
+  title: "CustomerLead CRM",
+  description: "Customer inquiries, reply reviews, and follow-ups in one workspace.",
+  icons: { icon: [{ url: "/brand/customerlead.svg", type: "image/svg+xml" }] },
+};
 
 export default function RootLayout({
   children,
