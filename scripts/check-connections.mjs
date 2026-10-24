@@ -5,6 +5,7 @@ import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { request as httpRequest } from 'node:http';
 import { startTenantSupabase } from './qa/tenant-supabase.mjs';
 const root = process.cwd(), app = path.join(root, 'templates/leads'), output = path.join(root, '.local-preview/connections');
 mkdirSync(output, { recursive: true });
@@ -20,6 +21,21 @@ try {
   let ready = false;
   for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/login', { signal: AbortSignal.timeout(3000) })).ok) { ready = true; break; } } catch {} await new Promise(r => setTimeout(r, 1000)); }
   assert(ready, 'QA server did not become ready.');
+  // Node fetch replaces Host; use a direct HTTP request to exercise the real
+  // incoming host through Next's proxy without following a production redirect.
+  const requestHost = (resource, host) => new Promise((resolve, reject) => {
+    const request = httpRequest(new URL(base + resource), { headers: { Host: host } }, response => {
+      response.resume(); resolve({ status: response.statusCode, headers: new Headers(response.headers) });
+    });
+    request.on('error', reject); request.end();
+  });
+  for (const host of ['ai-customer-lead-crm-system.vercel.app', 'ai-customer-lead-crm-system-1hmk.vercel.app']) {
+    const redirect = await requestHost('/login?next=%2Finbox', host);
+    assert.equal(redirect.status, 307); assert.equal(redirect.headers.get('location'), 'https://ai-customer-lead-crm-system-oyh1.vercel.app/login?next=%2Finbox');
+    assert.match(redirect.headers.get('cache-control'), /no-store/);
+    const api = await requestHost('/api/crm', host);
+    assert.equal(api.status, 401); assert.equal(api.headers.get('location'), null, 'API authentication must not redirect between projects.');
+  }
   browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   assert.equal((await context.request.get(base + '/api/connections/google')).status(), 401);
@@ -81,7 +97,7 @@ try {
   await page.evaluate(() => document.documentElement.classList.add('dark')); await page.screenshot({ path: path.join(output, 'ready-mobile-dark.png'), fullPage: true });
   assert.deepEqual(errors, []);
   const snapshot = await (await context.request.get(base + '/api/crm')).json(); assert.equal(snapshot.leads.length, 0); assert.equal(snapshot.mailJobs.length, 0);
-  console.log('Passed isolated connection UI/API checks: authentication, worker authentication, owner-only access, origin checks, disabled setup, automatic progress, confirmed asynchronous enable/pause, offline queued setup without mutation retries, uncertain-result stop, mobile/dark layout. Google/n8n were simulated; no real account, Sheet, workflow or email was created.');
+  console.log('Passed isolated connection UI/API checks: old public address redirects with API authentication retained, authentication, worker authentication, owner-only access, origin checks, disabled setup, automatic progress, confirmed asynchronous enable/pause, offline queued setup without mutation retries, uncertain-result stop, mobile/dark layout. Google/n8n were simulated; no real account, Sheet, workflow or email was created.');
 } finally {
   await browser?.close();
   if (server.pid) server.kill('SIGTERM');

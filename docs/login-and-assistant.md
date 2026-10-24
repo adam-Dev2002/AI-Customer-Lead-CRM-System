@@ -1,5 +1,13 @@
 # ClearFlow sign-in and Gemini assistant
 
+**24 October 2026 login fix:** use
+https://ai-customer-lead-crm-system-oyh1.vercel.app/login. The older public
+`ai-customer-lead-crm-system.vercel.app` and `-1hmk` browser addresses redirect to
+this selected CRM before authentication, preserving the requested page. Configure
+Google connection variables on the **-oyh1** Vercel project; other projects attached
+to this repo have independent environment settings. No password reset or account
+recreation is needed to correct the old website address.
+
 **22 October 2026 update:** the private-business signup release supersedes this
 guide's original invitation-only setup. Follow [business accounts and hosting](business-accounts-and-hosting.md)
 for the new migration, immediate signup without email confirmation, and deployment checks.

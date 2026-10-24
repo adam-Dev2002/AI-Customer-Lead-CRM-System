@@ -1,8 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseConfiguration } from "@/lib/auth/config";
+import { customerPageRedirect } from "@/lib/auth/customer-site";
 
 export async function proxy(request: NextRequest) {
+  const customerURL = customerPageRedirect(request.nextUrl, request.headers.get("host"), request.method);
+  if (customerURL) {
+    const redirect = NextResponse.redirect(customerURL, 307);
+    redirect.headers.set("Cache-Control", "private, no-store");
+    return redirect;
+  }
   let response = NextResponse.next({ request });
   const config = supabaseConfiguration();
   const publicPage = request.nextUrl.pathname === "/login" || request.nextUrl.pathname.startsWith("/auth/");

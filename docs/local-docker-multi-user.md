@@ -52,6 +52,18 @@ values. A public worker heartbeat still returned 401 before this update's
 deployment; Production configuration is not yet confirmed. Saving the file in
 the IDE does not send it to Vercel, and Git intentionally excludes it.
 
+There are multiple Vercel projects attached to this repo. The selected project
+is **ai-customer-lead-crm-system-oyh1**. Runtime checks confirmed the new Google
+variables were added to the older **ai-customer-lead-crm-system** project instead;
+its sign-in fails at shared quota configuration while the -oyh1 sign-in checks
+pass. Copy the 10 connection entries into **-oyh1 Production** and redeploy it.
+Do not replace existing Supabase values or move secret files into Git.
+
+Browser pages on the two older public aliases now redirect to -oyh1 before
+session/configuration checks, preserving the page and query. Local development,
+the selected site and custom domains are unchanged. APIs and non-GET/HEAD
+requests retain their own authentication rather than redirecting credentials.
+
 ## One-time operator setup
 
 Customers only use Connections. The following steps belong to the maintainer.
