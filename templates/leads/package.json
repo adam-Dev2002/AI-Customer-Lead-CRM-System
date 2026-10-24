@@ -12,8 +12,9 @@
     "start": "next start",
     "lint": "eslint",
     "test:cloud": "node --experimental-strip-types --test tests/cloud-storage.test.mjs",
-    "test": "node --experimental-strip-types --test tests/domain.test.mjs tests/csv.test.mjs tests/integration.test.mjs tests/mail.test.mjs tests/followups.test.mjs tests/form-followups.test.mjs tests/inquiry-growth.test.mjs tests/inquiry-form.test.mjs tests/record-sort.test.mjs tests/record-filter.test.mjs tests/inquiry-preview.test.mjs tests/workflow-wiring.test.mjs tests/unified-workflow.test.mjs tests/contact-photos.test.mjs tests/company-logos.test.mjs tests/assistant.test.mjs tests/business-logo.test.mjs tests/reports.test.mjs tests/auth-config.test.mjs tests/new-workspace.test.mjs tests/auth-failures.test.mjs tests/signup-policy.test.mjs",
-    "test:tenants": "node --experimental-strip-types --test tests/tenant-storage.test.mjs"
+    "test": "node --experimental-strip-types --test tests/domain.test.mjs tests/csv.test.mjs tests/integration.test.mjs tests/mail.test.mjs tests/followups.test.mjs tests/form-followups.test.mjs tests/inquiry-growth.test.mjs tests/inquiry-form.test.mjs tests/record-sort.test.mjs tests/record-filter.test.mjs tests/inquiry-preview.test.mjs tests/workflow-wiring.test.mjs tests/unified-workflow.test.mjs tests/contact-photos.test.mjs tests/company-logos.test.mjs tests/assistant.test.mjs tests/business-logo.test.mjs tests/reports.test.mjs tests/auth-config.test.mjs tests/new-workspace.test.mjs tests/auth-failures.test.mjs tests/signup-policy.test.mjs tests/connections.test.mjs tests/credential-importer.test.mjs",
+    "test:tenants": "node --experimental-strip-types --test tests/tenant-storage.test.mjs tests/connections-storage.test.mjs tests/pull-onboarding.test.mjs",
+    "test:connections": "node --experimental-strip-types --test tests/connections.test.mjs tests/connections-storage.test.mjs tests/credential-importer.test.mjs tests/local-worker.test.mjs tests/pull-onboarding.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

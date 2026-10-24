@@ -3,7 +3,7 @@ import { ActionIcon } from "./action-icon";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, ChartArea, Mail, CalendarDays, ListTodo, Users, History, Settings, HelpCircle, ChevronRight, Bell, Search, Command, Loader2, BookOpen } from "lucide-react";
+import { LayoutGrid, ChartArea, Mail, CalendarDays, ListTodo, Users, History, Settings, HelpCircle, ChevronRight, Bell, Search, Command, Loader2, BookOpen, Plug } from "lucide-react";
 import {
   Sidebar,
   SidebarProvider,
@@ -44,6 +44,7 @@ const menu = [
   { title: "Tasks", href: "/tasks", icon: ListTodo, tone: "emerald" },
   { title: "Contacts", href: "/contacts", icon: Users, tone: "blue" },
   { title: "Activity", href: "/activity", icon: History, tone: "neutral" },
+  { title: "Connections", href: "/connections", icon: Plug, tone: "blue" },
   { title: "How it works", href: "/automation", icon: BookOpen, tone: "violet" },
 ];
 function Navigation({ signedInUser }: { signedInUser: SignedInUser }) {

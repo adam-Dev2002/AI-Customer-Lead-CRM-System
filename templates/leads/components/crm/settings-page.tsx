@@ -43,7 +43,7 @@ export function SettingsPage({ canManageLogo = false, customerForm = null, accou
         title="Workspace settings"
         description="Make this workspace fit the way you run your business."
       />
-      {accountEmail && <Panel title="Your account" icon={Mail} tone="blue"><div className="space-y-2 p-5 text-sm"><p className="break-all">Signed in as <strong>{accountEmail}</strong></p><p className="text-xs leading-6 text-muted-foreground">Your account opens this business workspace. Your business contact email below is a separate preference.</p>{data.settings.brandPreset === "generic" && !data.mailSenderEmail && <p role="status" className="text-sm leading-6">Your private workspace is ready. Email processing is still being set up for your business. Contact support to connect your business inbox.</p>}</div></Panel>}
+      {accountEmail && <Panel title="Your account" icon={Mail} tone="blue"><div className="space-y-2 p-5 text-sm"><p className="break-all">Signed in as <strong>{accountEmail}</strong></p><p className="text-xs leading-6 text-muted-foreground">Your account opens this business workspace. Your business contact email below is a separate preference.</p>{data.settings.brandPreset === "generic" && !data.mailSenderEmail && <p role="status" className="text-sm leading-6">Your private workspace is ready. <Link className="text-primary underline underline-offset-4" href="/connections">Connect your business inbox</Link> to set up email processing.</p>}</div></Panel>}
       <LogoSettings canManage={canManageLogo} />
       <InquiryFormSettings link={customerForm} />
       <form

@@ -12,14 +12,20 @@ and a confirmed Gmail result.
 ## Start here
 
 Returning to the project? Read [Welcome back](docs/start-here.md) for the current
-checkpoint and what remains. The website and Supabase are set up; hosting the
-local n8n automation is still pending.
+checkpoint and what remains. The website and Supabase are set up. The owner has
+deferred hosting and selected the existing local Docker n8n for multi-user tests.
 
 The [business accounts and hosting handover](docs/business-accounts-and-hosting.md)
-covers the new private-business signup release. Production rollout still needs
-the Supabase workspace migration, immediate-signup policy configuration and
-deployment verification. New businesses need their own automation connections;
+covers private-business signup. The workspace migration and immediate-signup
+policy are applied. New businesses need their own automation connections;
 creating an account does not connect Gmail.
+
+The [customer Google onboarding implementation](docs/customer-google-onboarding.md)
+adds a Connections page for owner-approved Google access, automatic Sheet creation
+and separate predefined n8n setup. For the selected public website + local Docker
+arrangement, follow [local Docker multi-user setup](docs/local-docker-multi-user.md).
+Connection SQL and the local operator API check now pass. Google OAuth/Production
+configuration, deployment and live second-business acceptance are still pending.
 
 The [illustrated setup guide](docs/setup-combined-workflow.md) follows the selected
 **128-node combined Gemini workflow**, with fictional customers, seven dashboard

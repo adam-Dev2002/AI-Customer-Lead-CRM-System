@@ -1,0 +1,22 @@
+name: customerlead-automation
+services:
+  automation:
+    build: .
+    restart: unless-stopped
+    env_file: runtime.env
+    environment:
+      N8N_HOST: ${N8N_PUBLIC_HOST:?Set the hosted automation hostname}
+      N8N_PROTOCOL: https
+      N8N_PORT: 5678
+      WEBHOOK_URL: https://${N8N_PUBLIC_HOST}/
+      N8N_EDITOR_BASE_URL: https://${N8N_PUBLIC_HOST}/
+      N8N_PROXY_HOPS: 2
+      N8N_SECURE_COOKIE: "true"
+      GENERIC_TIMEZONE: Asia/Singapore
+      TZ: Asia/Singapore
+      EXECUTIONS_DATA_SAVE_ON_SUCCESS: none
+      EXECUTIONS_DATA_SAVE_ON_ERROR: none
+    volumes:
+      - ./state/n8n:/home/node/.n8n
+    ports:
+      - 127.0.0.1:8080:8080

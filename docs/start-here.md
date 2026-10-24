@@ -4,6 +4,13 @@ This is the place to start when you return. You do not need to set everything up
 
 **Handover: 22 October 2026; last hosted-setup checkpoint: 21 October.** The website is on Vercel and the CRM records are in Supabase. The combined n8n automation remains installed in Docker on the Windows computer. It processes inquiries only while Docker/n8n is running. Automation hosting remains unfinished.
 
+**24 October update:** the owner deferred hosting and chose the public CRM with
+the existing Docker container. Follow [local Docker multi-user setup](local-docker-multi-user.md).
+Private signup is deployed, Confirm Email is off, connection SQL is applied, and
+the installed local worker's read-only API check passes. Google app/Production
+configuration and real second-business verification remain pending. The original
+workflow's local receiver address still needs alignment with the public CRM.
+
 The new [private business accounts and hosting guide](business-accounts-and-hosting.md) describes immediate signup into a private workspace, without a confirmation email. Its Supabase migration, **Confirm Email off** policy and verified Production deployment are required; a code release does not change those platform settings. Signup needs no SMTP delivery; password recovery still uses email. Each new business starts with separate records and needs its own automation connection.
 
 ![The dashboard, shown with fictional customers](images/setup/dashboard.png)
@@ -16,7 +23,7 @@ The new [private business accounts and hosting guide](business-accounts-and-host
 | --- | --- |
 | Website | Deployed to Vercel. Use **Visit** on the existing project's Production deployment. |
 | Login and CRM storage | Supabase is connected. Keep the existing project, accounts and private environment values. |
-| Private business signup | Code prepared; database migration, confirmation delivery and Production verification pending. See the [rollout steps](business-accounts-and-hosting.md#apply-the-account-release-safely). |
+| Private business signup | Deployed with private workspace provisioning and immediate signup. Separate automation connections still need verification. |
 | Automation | The selected combined export has **128 nodes**, uses Gemini, and was exported as active. It is still a local n8n installation. |
 | Customer form | The existing saved address points to local n8n. A public customer link needs the automation's future HTTPS address. |
 | Automation host | Not deployed. Northflank asked this account for a payment card, so that route stopped. |
@@ -35,7 +42,7 @@ A published website does not keep local n8n running. When the PC is off, the web
 
 - **I want to understand or recreate the setup:** follow the [illustrated setup guide](setup-combined-workflow.md). Use a separate practice workspace for the dummy examples.
 - **I want separate business accounts:** follow the [new account rollout](business-accounts-and-hosting.md). Keep the existing ClearFlow records and prepare a separate connection for each business.
-- **I am ready to host n8n:** [check ClawCloud's conditional free-credit route](business-accounts-and-hosting.md#next-step-check-clawcloud-without-moving-existing-data), then follow the [migration order](business-accounts-and-hosting.md#move-the-existing-automation-after-a-host-is-selected). The GitHub age prerequisite is met; actual hosting eligibility and continuous workload cost remain unverified.
+- **I am ready to host n8n:** hosting is deferred. The earlier ClawCloud Run suggestion was stale; the service discontinued its free offering. Select and verify an available host before following the [migration order](business-accounts-and-hosting.md#move-the-existing-automation-after-a-host-is-selected).
 
 ## Which workflow file should I use?
 

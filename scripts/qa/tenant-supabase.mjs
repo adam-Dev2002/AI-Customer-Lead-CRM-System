@@ -29,6 +29,15 @@ export async function startTenantSupabase({ legacyData = createEmptyWorkspace('E
       case 'crm_resolve_workspace_token': return service('public.crm_resolve_workspace_token($1)', [body.p_token_hash]);
       case 'crm_workspace_connection': return service('public.crm_workspace_connection($1)', [body.p_workspace_id]);
       case 'crm_consume_limit': return service('public.crm_consume_limit($1,$2,$3)', [body.p_key, body.p_limit, body.p_window_ms]);
+      case 'crm_connection_read': return service('public.crm_connection_read($1)', [body.p_workspace_id]);
+      case 'crm_connection_save': return service('public.crm_connection_save($1,$2,$3)', [body.p_workspace_id, body.p_revision, body.p_payload]);
+      case 'crm_connection_register': return service('public.crm_connection_register($1,$2)', [body.p_workspace_id, body.p_token_hash]);
+      case 'crm_onboarding_heartbeat': return service('public.crm_onboarding_heartbeat($1,$2)', [body.p_worker_id, body.p_ready]);
+      case 'crm_onboarding_worker_ready': return service('public.crm_onboarding_worker_ready($1)', [body.p_worker_id]);
+      case 'crm_connection_enqueue': return service('public.crm_connection_enqueue($1,$2,$3,$4::uuid,$5,$6)', [body.p_workspace_id, body.p_revision, body.p_payload, body.p_job_id, body.p_operation, body.p_job_payload]);
+      case 'crm_connection_job_claim': return service('public.crm_connection_job_claim($1,$2::uuid)', [body.p_worker_id, body.p_claim_id]);
+      case 'crm_connection_job_read': return service('public.crm_connection_job_read($1::uuid,$2,$3::uuid)', [body.p_job_id, body.p_worker_id, body.p_claim_id]);
+      case 'crm_connection_job_finish': return service('public.crm_connection_job_finish($1::uuid,$2,$3::uuid,$4,$5,$6,$7)', [body.p_job_id, body.p_worker_id, body.p_claim_id, body.p_result_hash, body.p_status, body.p_revision, body.p_payload]);
       default: throw Object.assign(new Error('Unknown isolated RPC.'), { status: 404 });
     }
   };
@@ -43,7 +52,7 @@ export async function startTenantSupabase({ legacyData = createEmptyWorkspace('E
       create schema auth; create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz, deleted_at timestamptz);
       create function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;
       create schema storage; create table storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint);`);
-    for (const migration of ['202610200001_crm_workspace_access.sql', '202610210001_crm_cloud_storage.sql', '202610220001_crm_private_workspaces.sql']) {
+    for (const migration of ['202610200001_crm_workspace_access.sql', '202610210001_crm_cloud_storage.sql', '202610220001_crm_private_workspaces.sql', '202610240001_crm_google_connections.sql', '202610240002_crm_local_onboarding_worker.sql']) {
       await db.exec(await readFile(new URL('../../supabase/migrations/' + migration, import.meta.url), 'utf8'));
     }
     await rpc('crm_store_import', { p_data: legacyData });

@@ -23,6 +23,8 @@ CLAUDE.md
 /deploy/customerlead/n8n-runtime.env
 /deploy/customerlead/state/
 /deploy/customerlead/backups/
+/deploy/n8n-onboarding/runtime.env
+/deploy/n8n-onboarding/state/
 /.pnp
 .pnp.js
 
