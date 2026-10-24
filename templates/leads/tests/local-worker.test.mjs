@@ -1,10 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { runWorkerOnce, executeWorkerJob, WorkerError, validateWorkerConfig } from '../../../deploy/n8n-onboarding/pull-worker.mjs';
+import { runWorkerOnce, executeWorkerJob, WorkerError, validateWorkerConfig, checkWorkerConnections } from '../../../deploy/n8n-onboarding/pull-worker.mjs';
 
 function memoryJournal(value = null) { return { value, async read() { return structuredClone(this.value); }, async write(v) { this.value = structuredClone(v); }, async clear() { this.value = null; } }; }
 const job = () => ({ id: randomUUID(), workspaceId: randomUUID(), operation: 'workflow', status: 'Claimed', payload: {} });
+test('public readiness checks only metadata and heartbeat, and requires confirmed authentication', async () => {
+  const config = { geminiCredentialId: 'qa-gemini' }, posts = [];
+  const clients = {
+    async n8n(resource, body) { assert.equal(resource, '/credentials/qa-gemini'); assert.equal(body, undefined); return { id: 'qa-gemini', type: 'httpHeaderAuth' }; },
+    async post(body) { posts.push(body); return { accepted: true }; },
+  };
+  assert.deepEqual(await checkWorkerConnections(clients, config), { localN8nReady: true, publicCrmReady: true, jobsExecuted: 0 });
+  assert.deepEqual(posts, [{ action: 'heartbeat', ready: true }]);
+  assert.equal((await checkWorkerConnections({ ...clients, post: async () => { throw new Error('Private provider diagnostic'); } }, config)).publicCrmReady, false);
+  assert.equal((await checkWorkerConnections({ ...clients, post: async () => ({ accepted: false }) }, config)).publicCrmReady, false);
+  const offline = await checkWorkerConnections({ n8n: async () => { throw new Error('Offline'); }, post: async () => assert.fail('No public request while local readiness is unconfirmed.') }, config);
+  assert.deepEqual(offline, { localN8nReady: false, publicCrmReady: false, jobsExecuted: 0 });
+});
 test('worker configuration only permits the public HTTPS CRM and loopback n8n', () => {
   const config = { crmOrigin: 'https://crm.example.test', n8nOrigin: 'http://127.0.0.1:5678', workerId: 'qa-worker-1234', workerKey: 'w'.repeat(40), apiKey: 'qa-api-key', projectId: 'qa-project', geminiCredentialId: 'qa-gemini' };
   assert.equal(validateWorkerConfig(config).n8nOrigin, 'http://127.0.0.1:5678');

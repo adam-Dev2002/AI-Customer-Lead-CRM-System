@@ -37,6 +37,16 @@ export async function localWorkerReady(clients, config) {
     return credential.id === config.geminiCredentialId && credential.type === 'httpHeaderAuth';
   } catch { return false; }
 }
+export async function checkWorkerConnections(clients, config) {
+  const localN8nReady = await localWorkerReady(clients, config);
+  let publicCrmReady = false;
+  // A heartbeat checks authentication and the applied SQL without claiming work.
+  if (localN8nReady) {
+    try { publicCrmReady = (await clients.post({ action: 'heartbeat', ready: true })).accepted === true; }
+    catch { /* Return only readiness; provider details may contain private values. */ }
+  }
+  return { localN8nReady, publicCrmReady, jobsExecuted: 0 };
+}
 function checkedId(value) {
   if (typeof value !== 'string' || !/^[\w-]{1,80}$/.test(value)) throw new WorkerError('verification-failed', true);
   return value;

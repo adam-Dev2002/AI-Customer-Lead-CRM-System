@@ -3,19 +3,24 @@ import { readFile, mkdir, writeFile, rename, rm } from 'node:fs/promises';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import net from 'node:net';
 import path from 'node:path';
-import { validateWorkerConfig, workerClients, localWorkerReady, runWorkerOnce } from './pull-worker.mjs';
+import { validateWorkerConfig, workerClients, localWorkerReady, checkWorkerConnections, runWorkerOnce } from './pull-worker.mjs';
 
 const filename = process.argv[process.argv.indexOf('--config') + 1];
 if (!process.argv.includes('--config') || !filename) throw new Error('Choose the private worker configuration file.');
 const config = validateWorkerConfig(JSON.parse(await readFile(filename, 'utf8')));
 config.receiptDirectory = path.join(path.dirname(filename), 'receipts');
 const clients = workerClients(config);
+if (process.argv.includes('--check-public')) {
+  const result = await checkWorkerConnections(clients, config);
+  console.log(JSON.stringify({ ...result, workerId: config.workerId, mode: 'outbound-only' }));
+  process.exit(result.localN8nReady && result.publicCrmReady ? 0 : 1);
+}
 if (process.argv.includes('--check')) {
   const localReady = await localWorkerReady(clients, config);
   console.log(JSON.stringify({ localN8nReady: localReady, workerId: config.workerId, mode: 'outbound-only', jobsExecuted: 0 }));
   process.exit(localReady ? 0 : 1);
 }
-if (!process.argv.includes('--run')) throw new Error('Use --check or --run.');
+if (!process.argv.includes('--run')) throw new Error('Use --check, --check-public or --run.');
 // An OS-owned loopback socket prevents duplicate processes and releases on
 // crashes. It serves no data and is never published outside the container.
 const guard = net.createServer(socket => socket.destroy());

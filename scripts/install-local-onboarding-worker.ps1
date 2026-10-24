@@ -3,6 +3,7 @@ param(
   [string]$ConfigFile = '',
   [switch]$Install,
   [switch]$Check,
+  [switch]$CheckPublic,
   [switch]$Start
 )
 $ErrorActionPreference = 'Stop'
@@ -10,8 +11,8 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 if (-not $ConfigFile) { $ConfigFile = Join-Path $projectRoot 'private-integrations\local-onboarding\worker.json' }
 if ($Container -notmatch '^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$') { throw 'Choose the existing n8n container name.' }
 $target = '/home/node/.n8n/customerlead-onboarding-worker'
-if (-not ($Install -or $Check -or $Start)) {
-  Write-Output "Plan: install the outbound-only worker into $Container at $target. Existing workflows and credentials are retained. Use -Install, then -Check, then -Start."
+if (-not ($Install -or $Check -or $CheckPublic -or $Start)) {
+  Write-Output "Plan: install the outbound-only worker into $Container at $target. Existing workflows and credentials are retained. Use -Install, then -CheckPublic, then -Start."
   exit 0
 }
 if (-not (Test-Path -LiteralPath $ConfigFile)) { throw 'Create the private worker.json using docs/local-docker-multi-user.md. Never paste its keys into chat.' }
@@ -42,9 +43,10 @@ if ($Install) {
   & docker exec $Container chmod 600 "$target/worker.json"
   if ($LASTEXITCODE -ne 0) { throw 'The worker configuration could not be protected.' }
 }
-if ($Check -or $Start) {
-  & docker exec $Container node "$target/run-pull-worker.mjs" --config "$target/worker.json" --check
-  if ($LASTEXITCODE -ne 0) { throw 'Local n8n/API/Gemini readiness has not passed. The worker was not started.' }
+if ($Check -or $CheckPublic -or $Start) {
+  $checkMode = if ($CheckPublic -or $Start) { '--check-public' } else { '--check' }
+  & docker exec $Container node "$target/run-pull-worker.mjs" --config "$target/worker.json" $checkMode
+  if ($LASTEXITCODE -ne 0) { throw 'Connection readiness has not passed. Verify local n8n and the public Vercel Production environment/redeployment. The worker was not started.' }
 }
 if ($Start) {
   & docker exec -d $Container node "$target/run-pull-worker.mjs" --config "$target/worker.json" --run

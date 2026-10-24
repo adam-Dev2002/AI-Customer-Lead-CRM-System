@@ -46,6 +46,12 @@ check passes with zero jobs executed. Its directory/config permissions are
 Google grant, live Sheet, credential, job, workflow activation or send has been
 performed by the implementation tests.
 
+The product Google client ID/secret and enabled flag have now been saved in the
+local private env file. Their presence is confirmed without printing their
+values. A public worker heartbeat still returned 401 before this update's
+deployment; Production configuration is not yet confirmed. Saving the file in
+the IDE does not send it to Vercel, and Git intentionally excludes it.
+
 ## One-time operator setup
 
 Customers only use Connections. The following steps belong to the maintainer.
@@ -85,12 +91,15 @@ Customers only use Connections. The following steps belong to the maintainer.
 7. From the project directory run:
 
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-local-onboarding-worker.ps1 -Install -Check
+   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-local-onboarding-worker.ps1 -Install -CheckPublic
    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-local-onboarding-worker.ps1 -Start
    ```
 
-   Install only copies the helper/config files. Check reads local n8n credential
-   metadata; it executes zero jobs. Start begins claiming owner-requested setup
+   Install only copies the helper/config files. `-Check` reads local n8n credential
+   metadata. `-CheckPublic` also confirms an authenticated public CRM heartbeat,
+   without claiming jobs, importing credentials or sending mail. `-Start` requires
+   both checks and refuses to start against an unconfigured Production deployment.
+   Start begins claiming owner-requested setup
    jobs. A worker heartbeat confirms transport, not inquiry/email delivery.
    Existing workflows and credentials are retained. Different installed config
    is refused so an encrypted pending journal cannot become unreadable.
