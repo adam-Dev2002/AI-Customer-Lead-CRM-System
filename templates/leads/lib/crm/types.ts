@@ -153,6 +153,15 @@ export interface SyncChange {
   createdAt: string;
   updatedAt: string;
 }
+export interface InboxScan {
+  runId: string;
+  phase: 'checking' | 'processing' | 'complete' | 'failed';
+  startedAt: string;
+  updatedAt: string;
+  matched?: number;
+  current?: number;
+  code?: string;
+}
 export interface CRMData {
   version: 1;
   emailMirrorVersion?: number;
@@ -164,6 +173,7 @@ export interface CRMData {
   notificationsReadAt: string;
   processedEventIds: string[];
   lastAutomationEventAt: string;
+  inboxScan?: InboxScan;
   syncChanges: SyncChange[];
   archivedLeadIds: string[];
   lastSyncPollAt: string;

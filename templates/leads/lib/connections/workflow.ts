@@ -2,6 +2,7 @@ import template from './workflow-template.json' with { type: 'json' };
 import { createHash } from 'node:crypto';
 import { ConnectionError, type ConnectionConfig } from './config.ts';
 import type { BusinessConnection } from './store.ts';
+import { addInboxReporting } from './workflow-inbox.mjs';
 export const leadHeaders = template.leadHeaders;
 export const reviewHeaders = template.reviewHeaders;
 // JSON is generated from reviewed source. Parameters retain n8n's heterogeneous
@@ -11,7 +12,7 @@ export function businessFormId(workspace: string) {
   const h = createHash('sha256').update('customerlead-self-service-form:' + workspace).digest('hex');
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
-export function provisionedWorkflow(data: BusinessConnection, workspace: string, config: ConnectionConfig) {
+export function provisionedWorkflow(data: BusinessConnection, workspace: string, config: ConnectionConfig, reporting = true) {
   if (!data.email || !data.spreadsheetId || !data.gmailCredentialId || !data.sheetsCredentialId || !data.crmCredentialId) throw new ConnectionError('not-ready');
   const workflow = structuredClone(template.workflow), nodes = workflow.nodes as Node[];
   const settings = nodes.find(n => n.name === 'Business connection')!.parameters.assignments.assignments;
@@ -22,6 +23,7 @@ export function provisionedWorkflow(data: BusinessConnection, workspace: string,
     const node = nodes.find(n => n.name === binding.node)!;
     node.credentials = { ...node.credentials, [binding.type]: { id: ids[binding.role as keyof typeof ids], name: 'CustomerLead ' + binding.role } };
   }
+  if (reporting) addInboxReporting(workflow, data.crmCredentialId);
   for (const node of nodes) {
     if (node.type.endsWith('.formTrigger')) node.webhookId = businessFormId(workspace);
     if (typeof node.parameters.url === 'string') node.parameters.url = node.parameters.url.replaceAll('https://crm.example.invalid', config.origin);

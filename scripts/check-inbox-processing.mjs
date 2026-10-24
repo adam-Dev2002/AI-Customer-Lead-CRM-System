@@ -1,0 +1,45 @@
+// Isolated browser + authenticated event API QA. No real mailbox or n8n runs.
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs';
+import { randomUUID, randomBytes, createHash } from 'node:crypto';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { startTenantSupabase } from './qa/tenant-supabase.mjs';
+const root=process.cwd(),app=path.join(root,'templates/leads'),output=path.join(root,'.local-preview/inbox-processing');mkdirSync(output,{recursive:true});
+const {chromium}=createRequire(path.join(root,'.local-tools/browser-testing/package.json'))('playwright-core');
+const service=await startTenantSupabase(),port=3026,base='http://127.0.0.1:'+port;
+const entry=path.join(output,'next-server.cjs');
+writeFileSync(entry,`const next=require(${JSON.stringify(path.join(app,'node_modules/next'))});const http=require('node:http');const app=next({dev:true,webpack:true,dir:${JSON.stringify(app)},hostname:'127.0.0.1',port:${port}});app.prepare().then(()=>http.createServer(app.getRequestHandler()).listen(${port},'127.0.0.1'));`);
+const log=createWriteStream(path.join(output,'server.log'));
+const server=spawn(process.execPath,[entry],{cwd:app,windowsHide:true,env:{...process.env,CRM_NEXT_DIST_DIR:'.next-inbox-qa',CRM_DATA_DIR:path.join(output,'isolated-'+randomUUID()),CRM_STORAGE_BACKEND:'supabase',NEXT_PUBLIC_SUPABASE_URL:service.url,NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:service.key,SUPABASE_SECRET_KEY:service.secret,SUPABASE_URL:service.url,CRM_GOOGLE_CONNECTIONS_ENABLED:'false',N8N_WEBHOOK_SECRET:randomUUID(),GEMINI_ASSISTANT_API_KEY:''},stdio:['ignore','pipe','pipe']});server.stdout.pipe(log);server.stderr.pipe(log);
+let browser;
+try{
+ let ready=false;for(let i=0;i<60;i++){try{if((await fetch(base+'/login',{signal:AbortSignal.timeout(3000)})).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,1000));}assert(ready);
+ browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+ const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+ assert.equal((await context.request.post(base+'/api/n8n/events',{data:{type:'inbox.scan'}})).status(),401);
+ const signup={action:'signup',businessName:'Inbox QA business',email:'inbox.qa@example.com',password:'isolated-inbox-password',confirmPassword:'isolated-inbox-password'};
+ assert.equal((await context.request.post(base+'/api/auth',{headers:{Origin:base},data:signup})).status(),200);
+ const workspace=(await service.sql('select workspace_id from public.crm_workspace_members m join auth.users u on m.user_id=u.id where u.email=$1',[signup.email])).rows[0].workspace_id;
+ const token='clw_'+randomBytes(32).toString('base64url');await service.rpc('crm_set_workspace_token',{p_workspace_id:workspace,p_token_hash:createHash('sha256').update(token).digest('hex')});
+ const send=async(phase,extra={},id=randomUUID())=>{const response=await context.request.post(base+'/api/n8n/events',{headers:{Authorization:'Bearer '+token},data:{eventId:id,type:'inbox.scan',data:{runId:'qa-scan',startedAt,phase,...extra}}});assert.equal(response.status(),200);return response.json();};
+ let startedAt=new Date().toISOString();
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/inbox');
+ const panel=page.getByRole('region',{name:'Inbox processing'});
+ await panel.getByText('Waiting for the first inbox check',{exact:true}).waitFor();
+ await send('checking');await panel.getByRole('button',{name:'Refresh status',exact:true}).click();await panel.getByText('Checking your Gmail inbox',{exact:true}).waitFor();
+ await send('processing',{matched:3,current:1});await panel.getByText('Processing email 1 of 3',{exact:true}).waitFor({timeout:10000});
+ await page.screenshot({path:path.join(output,'processing-desktop.png'),fullPage:true});
+ await send('processing',{matched:3,current:2});await panel.getByText('Processing email 2 of 3',{exact:true}).waitFor({timeout:10000});
+ await send('failed',{code:'gmail-access',error:'PRIVATE PROVIDER VALUE MUST NOT APPEAR'});await panel.getByText('Inbox processing needs attention',{exact:true}).waitFor({timeout:10000});assert(!await page.getByText('PRIVATE PROVIDER VALUE MUST NOT APPEAR').count());
+ assert(await panel.getByRole('link',{name:'Review connection'}).count());await page.screenshot({path:path.join(output,'failed-desktop.png'),fullPage:true});
+ const snapshot=await(await context.request.get(base+'/api/crm')).json();assert.equal(snapshot.inboxScan.phase,'failed');assert.equal(snapshot.leads.length,0);assert.equal(snapshot.mailJobs.length,0);assert.equal(snapshot.activities[0].status,'failed');
+ assert.equal((await service.rpc('crm_store_read')).data.inboxScan,undefined,'tenant status cannot alter original workspace');
+ const count=await service.sql('select count(*) as count from public.crm_workspace_state');assert.equal(Number(count.rows[0].count),2);
+ const now=Date.now();startedAt=new Date(now).toISOString();await send('complete',{runId:'empty-scan',matched:0});await panel.getByRole('button',{name:'Refresh status',exact:true}).click();await panel.getByText('Inbox checked — no new matching emails',{exact:true}).waitFor();
+ await page.setViewportSize({width:390,height:844});await page.reload();await panel.getByText('Inbox checked — no new matching emails',{exact:true}).waitFor();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(output,'empty-mobile.png'),fullPage:true});
+ await page.evaluate(()=>document.documentElement.classList.add('dark'));await page.screenshot({path:path.join(output,'empty-mobile-dark.png'),fullPage:true});
+ await page.goto(base+'/automation');await page.getByRole('region',{name:'Inbox processing'}).waitFor();
+ assert.deepEqual(errors,[]);console.log('Passed isolated authenticated inbox status, tenant isolation, automatic progress refresh, failure guidance, safe provider details, empty inbox, desktop/mobile/dark and no mail creation checks.');
+}finally{await browser?.close();if(server.pid)server.kill('SIGTERM');await service.close();log.end();}

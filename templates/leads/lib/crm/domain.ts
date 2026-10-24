@@ -13,6 +13,7 @@ import { readReportEmailPreferences } from "./email-preferences.ts";
 import { queueDraftReview, queueEmailMirrors, queueLeadChange, queueOwnerChanges } from "./integration.ts";
 import { safePhotoUrl } from "./contact-photos.ts";
 import { followUpApproved } from "./followup-email.ts";
+import { inboxFailureCopy, parseInboxScan, recordInboxScan } from './inbox-scan.ts';
 
 export class ValidationError extends Error {
   status: number;
@@ -653,6 +654,18 @@ export function applyAutomationEvent(
     data.lastAutomationEventAt = now;
     return { duplicate: false, ignored: true };
   };
+  if (event === 'inbox.scan') {
+    const scan = parseInboxScan(p, now);
+    if (!scan) throw new ValidationError('Provide a valid inbox scan status.');
+    const previous = data.inboxScan;
+    const changed = recordInboxScan(data, scan);
+    data.processedEventIds = [...data.processedEventIds, eventId].slice(-2000);
+    if (changed && ['complete', 'failed'].includes(scan.phase) && (previous?.runId !== scan.runId || previous.phase !== scan.phase)) {
+      data.activities.unshift({ id: makeId(), type: 'automation', title: scan.phase === 'failed' ? 'Inbox check failed' : 'Inbox checked', detail: scan.phase === 'failed' ? inboxFailureCopy[scan.code!] : `${scan.matched || 0} matching emails checked.`, status: scan.phase === 'failed' ? 'failed' : 'success', stage: 'inbox', executionId: scan.runId, createdAt: now });
+      data.activities = data.activities.slice(0, 3000);
+    }
+    return { duplicate: false, ...(!changed ? { ignored: true } : {}) };
+  }
   if (event === "support.processed") {
     // Persist the email inquiry and its draft in the same local transaction.
     const result = applyAutomationEvent(data, { eventId: `${eventId}:lead`, type: "lead.upsert", data: p }, now, makeId, true);

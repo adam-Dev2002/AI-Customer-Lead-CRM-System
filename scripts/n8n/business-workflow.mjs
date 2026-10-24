@@ -7,7 +7,9 @@ if(!/^[a-f0-9-]{36}$/.test(s.workspaceId)||s.workspaceId==='clearflow') throw ne
 if(!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(s.businessEmail)) throw new Error('Set the business inbox email.');
 if(!/^[A-Za-z0-9_-]{20,}$/.test(s.spreadsheetId)||s.spreadsheetId.includes('PASTE_')||s.spreadsheetId===s.originalSpreadsheetId) throw new Error('Create a NEW empty business spreadsheet and paste its ID in Business connection.');
 if(!s.geminiModel||s.geminiModel.includes('PASTE_')) throw new Error('Set the working Gemini model in Business connection.');
-if(new URL(s.crmBaseUrl).origin!==s.crmBaseUrl||!s.crmBaseUrl.startsWith('https://')) throw new Error('Use the HTTPS CRM origin without a trailing slash.');
+// The n8n Code sandbox does not expose the global URL constructor.
+const origin=typeof s.crmBaseUrl==='string'&&s.crmBaseUrl.match(/^https:\\/\\/([^:/?#@\\s]+)(?::([0-9]{1,5}))?$/);
+if(!origin||origin[1]!==origin[1].toLowerCase()||!origin[1].split('.').every(label=>/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))||(origin[2]&&(Number(origin[2])<1||Number(origin[2])>65535||Number(origin[2])===443))) throw new Error('Use the HTTPS CRM origin without a trailing slash.');
 return $input.all();`;
 export const mailboxCode = `const profile=$input.first().json;
 const original=$('Business connection').first();

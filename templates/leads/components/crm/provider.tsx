@@ -69,6 +69,7 @@ export function CRMProvider({ children, initialData = null }: { children: ReactN
   const activeDelivery = data?.mailJobs.some(
     (job) => job.status === "Queued" || job.status === "Sending",
   ) ?? false;
+  const activeInbox = data?.inboxScan?.phase === 'checking' || data?.inboxScan?.phase === 'processing';
   const notify = useCallback(
     (message: string, error = false) => setNotice({ message, error }),
     [],
@@ -111,9 +112,9 @@ export function CRMProvider({ children, initialData = null }: { children: ReactN
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
-    }, activeDelivery ? 3000 : 30000);
+    }, activeDelivery || activeInbox ? 3000 : 15000);
     return () => clearInterval(interval);
-  }, [refresh, activeDelivery]);
+  }, [refresh, activeDelivery, activeInbox]);
   const run = useCallback(
     async (
       action: string,

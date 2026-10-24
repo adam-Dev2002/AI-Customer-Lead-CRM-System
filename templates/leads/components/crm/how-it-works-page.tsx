@@ -11,6 +11,7 @@ import { activityAppearance } from "@/lib/crm/activity-appearance";
 import { ActivityMark, activityColors } from "./activity-mark";
 import { useCRM } from "./provider";
 import { UsageFaq } from "./usage-faq";
+import { InboxProcessing } from './inbox-processing';
 import { dateSortValue, dateSortLabels, sortRecords, type SortOption } from "@/lib/crm/record-sort";
 import type { SyncChange } from "@/lib/crm/types";
 import { matchesSelection } from "@/lib/crm/record-filter";
@@ -53,6 +54,7 @@ export function HowItWorksPage() {
         }}><ActionIcon action="retry" className={refreshing ? "animate-spin motion-reduce:animate-none" : undefined} />Refresh status</Button>
         <Button asChild><Link href="/settings"><ActionIcon action="settings" />Manage preferences</Link></Button>
       </PageHeading>
+      <InboxProcessing />
 
       <div className="crm-guide-banner flex flex-col justify-between gap-5 rounded-xl border p-5 sm:p-6 lg:flex-row lg:items-center">
         <div className="flex items-start gap-4">

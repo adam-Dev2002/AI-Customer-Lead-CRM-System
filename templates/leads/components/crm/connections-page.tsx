@@ -7,6 +7,7 @@ import type { PublicConnectionStatus } from '@/lib/connections/status';
 import { oauthResultMessage } from '@/lib/connections/status';
 import { PageHeading, Panel, StatusBadge } from './shared';
 import { useCRM } from './provider';
+import { InboxProcessing } from './inbox-processing';
 
 const ordered = ['google', 'labels', 'spreadsheet', 'gmail-credential', 'sheets-credential', 'crm-credential', 'register', 'workflow', 'verify', 'complete'];
 const milestones = [
@@ -73,6 +74,7 @@ export function ConnectionsPage() {
   const lastPoll = [data.lastSyncPollAt, data.lastMailPollAt].filter(Boolean).sort().at(-1);
   return <div className="space-y-6">
     <PageHeading title="Connections" description="Connect the email account your business uses for customer inquiries." />
+    {status?.phase === 'active' && <InboxProcessing />}
     <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
       <Panel title="Your business email" icon={Mail}>
         <div className="space-y-5 p-5 sm:p-6">

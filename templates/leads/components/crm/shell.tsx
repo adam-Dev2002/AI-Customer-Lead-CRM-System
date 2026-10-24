@@ -34,6 +34,7 @@ import { ActivityMark, activityColors } from "./activity-mark";
 import { BrandLogo } from "./brand-logo";
 import { WorkspaceAssistant } from "./workspace-assistant";
 import { WorkspaceBranding } from "./workspace-branding";
+import { inboxScanView } from '@/lib/crm/inbox-scan';
 type SignedInUser = { id: string; email: string; name: string; role: string };
 const menu = [
   { title: "Dashboard", href: "/", icon: LayoutGrid, tone: "violet" },
@@ -54,6 +55,7 @@ function Navigation({ signedInUser }: { signedInUser: SignedInUser }) {
   const pending = data.drafts.filter(
     (d) => d.status === "Pending review",
   ).length;
+  const inbox = inboxScanView(data.inboxScan);
   return (
     <Sidebar collapsible="offcanvas" className="lg:border-r-0!">
       <SidebarHeader className="p-4 pb-3 lg:p-5 lg:pb-4">
@@ -128,17 +130,17 @@ function Navigation({ signedInUser }: { signedInUser: SignedInUser }) {
           ))}
         </SidebarMenu>
         <Link
-          href="/settings#integrations"
+          href="/inbox"
           onClick={() => setOpenMobile(false)}
           className="crm-interactive rounded-lg border bg-background p-3"
         >
           <span className="flex items-center gap-2 text-xs font-medium">
-            <span className="size-1.5 rounded-full bg-amber-500" />
+            <span className={`size-1.5 rounded-full ${inbox.state === 'complete' ? 'bg-emerald-500' : inbox.state === 'running' ? 'bg-primary' : 'bg-amber-500'}`} />
             Workspace status
             <ChevronRight className="ml-auto size-3" />
           </span>
           <span className="mt-1.5 block text-[11px] text-muted-foreground">
-            {data.connection.lastEventAt ? "Inquiry activity received" : "Waiting for inquiry activity"}
+            {inbox.title}
           </span>
         </Link>
         <div className="flex items-center gap-3 px-1">

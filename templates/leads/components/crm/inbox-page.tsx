@@ -8,6 +8,7 @@ import { useCRM } from "./provider";
 import { OutgoingMail } from "./outgoing-mail";
 import { ReplyReviews } from "./reply-reviews";
 import { InquiryPreview } from "./inquiry-preview";
+import { InboxProcessing } from './inbox-processing';
 import { inboxHref, inboxViews, readInboxView, type InboxView } from "@/lib/crm/inbox-navigation";
 import type { Draft } from "@/lib/crm/types";
 import { leadStatuses, priorities } from "@/lib/crm/types";
@@ -57,6 +58,7 @@ export function InboxPage() {
         title="Customer inbox"
         description="Read inquiries, review AI replies and track outgoing emails in one place."
       />
+      <InboxProcessing />
       <div
         role="tablist"
         aria-label="Inbox views"
