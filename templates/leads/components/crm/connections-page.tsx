@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Check, Circle, ExternalLink, FileSpreadsheet, Loader2, Mail, Pause, Plug, ShieldCheck } from 'lucide-react';
+import { Check, Circle, ExternalLink, FileSpreadsheet, Loader2, Mail, Pause, Plug, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { PublicConnectionStatus } from '@/lib/connections/status';
 import { oauthResultMessage } from '@/lib/connections/status';
@@ -27,6 +27,19 @@ export function ConnectionsPage() {
     setStatus(result as PublicConnectionStatus); return result as PublicConnectionStatus;
   }, []);
   useEffect(() => { setError(oauthResultMessage(new URL(window.location.href).searchParams.get('connectionError'))); reload().catch(e => setError(e.message)); }, [reload]);
+  // Read status after an operator repair or worker reconnect even when setup is
+  // stopped at an error. This does not execute or recreate a setup step.
+  useEffect(() => {
+    if (!status || status.managed || !['attention', 'ready', 'paused'].includes(status.phase)) return;
+    const timer = setInterval(() => { reload().catch(() => {}); }, 15000);
+    return () => clearInterval(timer);
+  }, [status?.phase, status?.managed, reload]);
+  async function checkStatus() {
+    setBusy(true); setError('');
+    try { await reload(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not check your connection.'); }
+    finally { setBusy(false); }
+  }
   async function action(value: string) {
     setBusy(true); setError('');
     try {
@@ -70,7 +83,7 @@ export function ConnectionsPage() {
           {status?.available && !status.managed && <>
             {['not-connected', 'authorizing'].includes(status.phase) && <><p className="text-sm leading-6 text-muted-foreground">Google will ask you to approve access to read and organize inquiries, prepare and send replies, and create the spreadsheet used by this service. You choose the account; we never ask for your Google password.</p><Button disabled={busy} onClick={() => action('connect')}>{busy ? <Loader2 className="size-4 animate-spin" /> : <Plug className="size-4" />}Connect Google</Button></>}
             {status.phase === 'setting-up' && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin motion-reduce:animate-none" />Preparing your connection. You can return to this page to continue.</p>}
-            {status.canRetry && <Button disabled={busy} variant="outline" onClick={() => action('advance')}>Retry setup step</Button>}
+            {status.phase === 'attention' && <div className="space-y-3"><p className="text-xs leading-6 text-muted-foreground">Completed setup steps are saved. Rechecking uses your existing account, spreadsheet and confirmed connections.</p>{status.workerOnline === false && <p role="status" className="text-sm leading-6 text-muted-foreground">The background service is offline. We’ll check its status again automatically. You can retry when it reconnects.</p>}<div className="flex flex-wrap gap-2">{status.canRetry && <Button disabled={busy || status.workerOnline === false} variant="outline" onClick={() => action('advance')}><RefreshCw className="size-4" />{status.step === 'verify' ? 'Recheck connection' : 'Retry setup step'}</Button>}<Button disabled={busy} variant="ghost" onClick={checkStatus}><RefreshCw className={`size-4 ${busy ? 'animate-spin motion-reduce:animate-none' : ''}`} />Refresh status</Button></div></div>}
             {ready && <div className="space-y-4 rounded-lg border bg-muted/20 p-4"><label className="flex cursor-pointer items-start gap-3 text-sm leading-6"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} /> <span>I confirm that {status.email} is the inbox this business should process. Existing email preferences will apply.</span></label><Button disabled={busy || !confirmed || status.pending} onClick={() => action('enable')}>{(busy || status.pending) && <Loader2 className="size-4 animate-spin" />}{status.pending ? 'Waiting for processing to start…' : 'Enable inquiry processing'}</Button></div>}
             {status.phase === 'active' && <><p className="text-sm leading-6 text-muted-foreground">Inquiry processing is enabled. New emails are normally checked every five minutes. Reply approval and the separate sending confirmation still apply.</p><Button disabled={busy || status.pending} variant="outline" onClick={() => action('pause')}><Pause className="size-4" />{status.pending ? 'Waiting for processing to pause…' : 'Pause processing'}</Button></>}
           </>}

@@ -39,7 +39,9 @@ test('two private users provision and control separate workflows through an outb
         const id = resource.split('/')[2], saved = workflows.get(id);
         if (resource.endsWith('/activate')) saved.active = true;
         if (resource.endsWith('/deactivate')) saved.active = false;
-        return structuredClone(saved);
+        const resolved = structuredClone(saved);
+        for (const node of resolved.nodes) for (const binding of Object.values(node.credentials || {})) binding.name = 'Stored name for ' + binding.id;
+        return resolved;
       },
     };
     const request = async (input, options) => {
@@ -49,7 +51,14 @@ test('two private users provision and control separate workflows through an outb
       return new Response(JSON.stringify({ spreadsheetId: 'qa_sheet_' + i + '_123456789012345', sheets: [{ properties: { title: 'Leads' } }, { properties: { title: 'ReplyReviews' } }] }));
     };
     const journal = { value: null, async read() { return structuredClone(this.value); }, async write(value) { this.value = structuredClone(value); }, async clear() { this.value = null; } };
-    const execute = (job, worker, service) => executeWorkerJob(job, worker, service, { importExecute: async filename => imports.push(JSON.parse(await readFile(filename, 'utf8'))[0]) });
+    let rejectedWrongBinding = false;
+    const execute = async (job, worker, service) => {
+      const binding = job.operation === 'verify' && !rejectedWrongBinding ? workflows.get(job.payload.workflowId).nodes.find(node => node.credentials?.gmailOAuth2).credentials.gmailOAuth2 : null;
+      const originalId = binding?.id;
+      if (binding) { binding.id = 'other-business-credential'; rejectedWrongBinding = true; }
+      try { return await executeWorkerJob(job, worker, service, { importExecute: async filename => imports.push(JSON.parse(await readFile(filename, 'utf8'))[0]) }); }
+      finally { if (binding) binding.id = originalId; } // Simulated operator restoration before a safe recheck.
+    };
     const worker = { ...config, projectId: 'qa-project', receiptDirectory };
     for (let round = 0; round < 7; round++) {
       for (const space of spaces) {
@@ -58,11 +67,17 @@ test('two private users provision and control separate workflows through an outb
       }
       // Each business can have an independent queued job; one worker handles both.
       await runWorkerOnce(worker, clients, journal, execute); await runWorkerOnce(worker, clients, journal, execute);
+      if (round === 5) {
+        const failed = (await spaces[0].repo.read()).data;
+        assert.equal(failed.phase, 'attention'); assert.equal(failed.error, 'connection-changed'); assert.equal(failed.pending, undefined);
+        assert.equal(workflows.get(failed.workflowId).active, false);
+      }
     }
     const a = (await spaces[0].repo.read()).data, b = (await spaces[1].repo.read()).data;
     assert.equal(a.phase, 'ready'); assert.equal(b.phase, 'ready');
     assert.notEqual(a.gmailCredentialId, b.gmailCredentialId); assert.notEqual(a.sheetsCredentialId, b.sheetsCredentialId); assert.notEqual(a.crmCredentialId, b.crmCredentialId); assert.notEqual(a.crmToken, b.crmToken); assert.notEqual(a.workflowId, b.workflowId);
     assert.equal(imports.length, 4); assert.equal(workflows.size, 2);
+    assert.equal((await supabase.sql("select count(*)::int as count from public.crm_connection_jobs where operation='verify' and status='Failed'")).rows[0].count, 1);
     assert(workflows.get(a.workflowId).nodes.filter(n => n.credentials?.gmailOAuth2).every(n => n.credentials.gmailOAuth2.id === a.gmailCredentialId));
     assert(!JSON.stringify(workflows.get(a.workflowId)).includes('http://127.0.0.1'));
     assert.equal((await supabase.rpc('crm_resolve_workspace_token', { p_token_hash: (await import('node:crypto')).createHash('sha256').update(a.crmToken).digest('hex') })).workspace_id, spaces[0].workspaceId);

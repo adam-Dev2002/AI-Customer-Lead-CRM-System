@@ -51,7 +51,12 @@ export function connectionMessage(code: string) {
     'connection-busy': 'Connection setup is already in progress. Please wait.',
     'uncertain-result': 'A setup result could not be confirmed. Contact support before trying again.',
     'provider-unavailable': 'The connected service is unavailable. Please try again shortly.',
-    'verification-failed': 'The connection could not be verified. Processing remains paused. Please contact support.',
+    'verification-failed': 'The final connection check did not finish. Your completed setup is saved. Recheck the connection to try again.',
+    'connection-changed': 'The saved background connection differs from this business’s setup. Your account and spreadsheet are kept. Contact support to review the connection safely.',
+    'connection-active': 'This business’s background connection is already enabled. Contact support to check it before continuing setup.',
+    'connection-missing': 'The background connection could not be found. Your Google account and spreadsheet are kept. Contact support to restore the connection safely.',
+    'google-account-changed': 'Google returned a different account from the one connected to this business. Contact support to check the connection safely.',
+    'spreadsheet-changed': 'The connected spreadsheet is missing required setup tabs. Restore the Leads and ReplyReviews tabs or contact support, then recheck the connection.',
     'not-ready': 'Finish connecting and checking your account before enabling processing.',
     'worker-offline': 'Your email connection is temporarily offline. Please try again shortly or contact support.',
   };

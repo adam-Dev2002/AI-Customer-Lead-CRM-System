@@ -2,11 +2,11 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { cloudRPC } from '../crm/cloud-store.ts';
 import { ConnectionError, openConnection, sealConnection, type ConnectionConfig } from './config.ts';
 import { connectionRepository, type BusinessConnection, type ConnectionRecord } from './store.ts';
+import { canonicalJSON, workflowDigest, workerFailureCodes } from './workflow-integrity.mjs';
+export { canonicalJSON, workflowDigest };
 
 export const workerOperations = ['gmail-credential', 'sheets-credential', 'crm-credential', 'workflow', 'verify', 'enable', 'pause'] as const;
 export type WorkerOperation = typeof workerOperations[number];
-export const canonicalJSON = (value: unknown): string => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(k => [k, item[k]])) : item);
-export const workflowDigest = (workflow: { nodes: unknown; connections: unknown }) => createHash('sha256').update(canonicalJSON({ nodes: workflow.nodes, connections: workflow.connections })).digest('hex');
 export function workerAuthorized(header: string | null, config: ConnectionConfig) {
   if (config.mode !== 'pull' || config.workerKey.length < 32) return false;
   const expected = Buffer.from('Bearer ' + config.workerKey), given = Buffer.from(header || '');
@@ -26,7 +26,7 @@ export async function enqueueConnectionJob(workspace: string, record: Connection
 export function validatedWorkerResult(operation: string, value: unknown) {
   if (!workerOperations.includes(operation as WorkerOperation) || !value || typeof value !== 'object') throw new ConnectionError('verification-failed');
   const raw = value as Record<string, unknown>;
-  if (raw.status === 'Failed' || raw.status === 'Uncertain') return { status: raw.status, code: raw.code === 'verification-failed' ? 'verification-failed' : raw.status === 'Uncertain' ? 'uncertain-result' : 'provider-unavailable' };
+  if (raw.status === 'Failed' || raw.status === 'Uncertain') return { status: raw.status, code: typeof raw.code === 'string' && workerFailureCodes.includes(raw.code) ? raw.code : raw.status === 'Uncertain' ? 'uncertain-result' : 'provider-unavailable' };
   if (raw.status !== 'Succeeded') throw new ConnectionError('verification-failed');
   if (operation.includes('credential') || operation === 'workflow') {
     if (typeof raw.id !== 'string' || !/^[\w-]{1,80}$/.test(raw.id)) throw new ConnectionError('verification-failed');

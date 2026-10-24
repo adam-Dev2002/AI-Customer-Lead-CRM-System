@@ -24,7 +24,6 @@ export function googleCredential(data: BusinessConnection, config: ConnectionCon
   const token = data.google!;
   return { name: 'CustomerLead ' + data.id + (type === 'gmailOAuth2' ? ' Gmail' : ' Sheets'), type, data: { clientId: config.clientId, clientSecret: config.clientSecret, customScopes: true, enabledScopes: token.scope, scope: token.scope, oauthTokenData: { access_token: token.access_token, refresh_token: token.refresh_token, token_type: 'Bearer', scope: token.scope, expires_at: new Date(token.expires_at).toISOString(), expires_in: Math.max(1, Math.floor((token.expires_at - Date.now()) / 1000)) } } };
 }
-const canonical = (value: unknown): string => JSON.stringify(value, (_key, entry) => entry && typeof entry === 'object' && !Array.isArray(entry) ? Object.fromEntries(Object.keys(entry).sort().map(k => [k, entry[k]])) : entry);
 function credentialId(result: { id?: unknown }) {
   if (typeof result.id !== 'string' || !/^[\w-]+$/.test(result.id)) throw new ConnectionError('uncertain-result');
   return result.id;
@@ -40,27 +39,37 @@ export async function advanceConnection(repo: ConnectionRepository, workspace: s
   const step = nextConnectionStep(record.data);
   if (step === 'complete') return record;
   if (config.mode === 'pull' && workerOperations.includes(step as WorkerOperation)) {
-    let data = { ...record.data };
-    if (data.google!.expires_at < Date.now() + 60000) {
-      data.google = await refreshGoogleToken(config, data.google!, deps.request || fetch);
-      record = await repo.save(record, data);
+    try {
+      let data = { ...record.data };
+      if (data.google!.expires_at < Date.now() + 60000) {
+        data.google = await refreshGoogleToken(config, data.google!, deps.request || fetch);
+        record = await repo.save(record, data);
+      }
+      let payload: Record<string, unknown>;
+      if (step === 'gmail-credential' || step === 'sheets-credential') payload = { requestId: data.id + (step === 'gmail-credential' ? ':gmail' : ':sheets'), credential: googleCredential(data, config, step === 'gmail-credential' ? 'gmailOAuth2' : 'googleSheetsOAuth2Api') };
+      else if (step === 'crm-credential') {
+        data.crmToken ||= 'clw_' + randomBytes(32).toString('base64url');
+        payload = { name: 'CustomerLead ' + data.id + ' CRM', type: 'httpHeaderAuth', data: { name: 'Authorization', value: 'Bearer ' + data.crmToken } };
+      } else if (step === 'workflow') {
+        data.formId = businessFormId(workspace);
+        payload = { workflow: provisionedWorkflow(data, workspace, config) };
+      } else if (step === 'verify') {
+        const request = deps.request || fetch;
+        if (await googleMailbox(data.google!, request) !== data.email) throw new ConnectionError('google-account-changed');
+        const sheet = await googleJSON(data.google!, `https://sheets.googleapis.com/v4/spreadsheets/${data.spreadsheetId}?fields=spreadsheetId,sheets(properties(title))`, undefined, undefined, request);
+        if (sheet.spreadsheetId !== data.spreadsheetId || !['Leads', 'ReplyReviews'].every(name => sheet.sheets?.some((s: { properties?: { title?: string } }) => s.properties?.title === name))) throw new ConnectionError('spreadsheet-changed');
+        payload = { workflowId: data.workflowId, graphHash: workflowDigest(provisionedWorkflow(data, workspace, config)) };
+      } else throw new ConnectionError('not-ready');
+      return enqueueConnectionJob(workspace, record, { ...data, phase: 'setting-up' }, step as WorkerOperation, payload, config);
+    } catch (error) {
+      // Persist known read/authorization failures so a refresh retains the real
+      // recovery advice. CAS cannot overwrite a job that another request queued.
+      const code = error instanceof ConnectionError ? error.code : 'setup-unavailable';
+      if (['google-account-changed', 'spreadsheet-changed', 'google-reconnect', 'google-permissions', 'provider-unavailable'].includes(code)) {
+        try { await repo.save(record, { ...record.data!, phase: 'attention', error: code }); } catch { /* A newer revision wins. */ }
+      }
+      throw error;
     }
-    let payload: Record<string, unknown>;
-    if (step === 'gmail-credential' || step === 'sheets-credential') payload = { requestId: data.id + (step === 'gmail-credential' ? ':gmail' : ':sheets'), credential: googleCredential(data, config, step === 'gmail-credential' ? 'gmailOAuth2' : 'googleSheetsOAuth2Api') };
-    else if (step === 'crm-credential') {
-      data.crmToken ||= 'clw_' + randomBytes(32).toString('base64url');
-      payload = { name: 'CustomerLead ' + data.id + ' CRM', type: 'httpHeaderAuth', data: { name: 'Authorization', value: 'Bearer ' + data.crmToken } };
-    } else if (step === 'workflow') {
-      data.formId = businessFormId(workspace);
-      payload = { workflow: provisionedWorkflow(data, workspace, config) };
-    } else if (step === 'verify') {
-      const request = deps.request || fetch;
-      if (await googleMailbox(data.google!, request) !== data.email) throw new ConnectionError('verification-failed');
-      const sheet = await googleJSON(data.google!, `https://sheets.googleapis.com/v4/spreadsheets/${data.spreadsheetId}?fields=spreadsheetId,sheets(properties(title))`, undefined, undefined, request);
-      if (sheet.spreadsheetId !== data.spreadsheetId || !['Leads', 'ReplyReviews'].every(name => sheet.sheets?.some((s: { properties?: { title?: string } }) => s.properties?.title === name))) throw new ConnectionError('verification-failed');
-      payload = { workflowId: data.workflowId, graphHash: workflowDigest(provisionedWorkflow(data, workspace, config)) };
-    } else throw new ConnectionError('not-ready');
-    return enqueueConnectionJob(workspace, record, { ...data, phase: 'setting-up' }, step as WorkerOperation, payload, config);
   }
   // A durable claim precedes each external side effect. A process crash leaves
   // the claim intact; a second request cannot recreate resources or send mail.
@@ -102,12 +111,13 @@ export async function advanceConnection(repo: ConnectionRepository, workspace: s
       if (workflow.active || workflow.activeVersionId) throw new ConnectionError('uncertain-result');
     } else if (step === 'verify') {
       const email = await googleMailbox(token, request);
-      if (email !== data.email) throw new ConnectionError('verification-failed');
+      if (email !== data.email) throw new ConnectionError('google-account-changed');
       const sheet = await googleJSON(token, `https://sheets.googleapis.com/v4/spreadsheets/${data.spreadsheetId}?fields=spreadsheetId,sheets(properties(title))`, undefined, undefined, request);
-      if (sheet.spreadsheetId !== data.spreadsheetId || !['Leads', 'ReplyReviews'].every(name => sheet.sheets?.some((s: { properties?: { title?: string } }) => s.properties?.title === name))) throw new ConnectionError('verification-failed');
+      if (sheet.spreadsheetId !== data.spreadsheetId || !['Leads', 'ReplyReviews'].every(name => sheet.sheets?.some((s: { properties?: { title?: string } }) => s.properties?.title === name))) throw new ConnectionError('spreadsheet-changed');
       const workflow = await n8nJSON(config, '/workflows/' + data.workflowId, undefined, undefined, request);
       const expected = provisionedWorkflow(data, workspace, config);
-      if (workflow.active || workflow.activeVersionId || canonical(workflow.nodes) !== canonical(expected.nodes) || canonical(workflow.connections) !== canonical(expected.connections)) throw new ConnectionError('verification-failed');
+      if (workflowDigest(workflow) !== workflowDigest(expected)) throw new ConnectionError('connection-changed');
+      if (workflow.active || workflow.activeVersionId) throw new ConnectionError('connection-active');
       data.verifiedAt = new Date().toISOString(); data.phase = 'ready';
     }
     delete data.pending; delete data.error;
@@ -130,14 +140,14 @@ export async function setProcessing(repo: ConnectionRepository, workspace: strin
     record = await repo.save(record, data);
   }
   if (config.mode === 'pull') {
-    if (enable && await googleMailbox(data.google!, request) !== data.email) throw new ConnectionError('verification-failed');
+    if (enable && await googleMailbox(data.google!, request) !== data.email) throw new ConnectionError('google-account-changed');
     return enqueueConnectionJob(workspace, record, data, enable ? 'enable' : 'pause', { workflowId: data.workflowId, graphHash: workflowDigest(provisionedWorkflow(data, workspace, config)) }, config);
   }
   if (enable) {
     const saved = await n8nJSON(config, '/workflows/' + data.workflowId, undefined, undefined, request);
     const expected = provisionedWorkflow(data, workspace, config);
-    if (canonical(saved.nodes) !== canonical(expected.nodes) || canonical(saved.connections) !== canonical(expected.connections)) throw new ConnectionError('verification-failed');
-    if (await googleMailbox(data.google!, request) !== data.email) throw new ConnectionError('verification-failed');
+    if (workflowDigest(saved) !== workflowDigest(expected)) throw new ConnectionError('connection-changed');
+    if (await googleMailbox(data.google!, request) !== data.email) throw new ConnectionError('google-account-changed');
   }
   record = await repo.save(record, { ...data, pending: { operation: enable ? 'enable' : 'pause', startedAt: new Date().toISOString() } });
   try {

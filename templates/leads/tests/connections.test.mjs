@@ -36,7 +36,11 @@ function provider(options = {}) {
     const id = url.pathname.split('/')[4], workflow = workflows.get(id);
     if (url.pathname.endsWith('/activate')) { workflow.active = true; return response(workflow); }
     if (url.pathname.endsWith('/deactivate')) { workflow.active = false; return response(workflow); }
-    if (workflow) return response(workflow);
+    if (workflow) {
+      const saved = structuredClone(workflow);
+      if (options.normalizeNames) for (const node of saved.nodes) for (const binding of Object.values(node.credentials || {})) binding.name = 'Stored name for ' + binding.id;
+      return response(saved);
+    }
     throw new Error('Unexpected QA call: ' + url.pathname);
   };
   return { request, calls, credentials, workflows, get sheetCreates() { return sheetCreates; }, get sheet() { return createdSheet; } };
@@ -115,8 +119,27 @@ test('workflow bindings are rechecked before activation and customer inputs neve
   for (let i = 0; i < 8; i++) await advanceConnection(repo, workspace, config, { request: remote.request, register: async () => true });
   const saved = (await repo.read()).data, workflow = remote.workflows.get(saved.workflowId);
   workflow.nodes.find(n => n.credentials?.gmailOAuth2).credentials.gmailOAuth2.id = 'wrong-business';
-  await assert.rejects(setProcessing(repo, workspace, config, true, remote.request), /verification-failed/);
+  await assert.rejects(setProcessing(repo, workspace, config, true, remote.request), /connection-changed/);
   assert.equal(workflow.active, false);
   const materialized = provisionedWorkflow({ ...saved, businessName: "'); throw new Error('injected'); //" }, randomUUID(), config);
   assert(!materialized.nodes.filter(n => n.parameters.jsCode).some(n => n.parameters.jsCode.includes("throw new Error('injected')")));
+});
+
+test('direct verification and activation accept resolved credential labels without duplicating completed resources', async () => {
+  const repo = repository(), remote = provider({ normalizeNames: true });
+  const deps = { request: remote.request, register: async () => true };
+  for (let i = 0; i < 8; i++) await advanceConnection(repo, workspace, config, deps);
+  assert.equal((await repo.read()).data.phase, 'ready');
+  await setProcessing(repo, workspace, config, true, remote.request);
+  assert.equal((await repo.read()).data.phase, 'active');
+  assert.equal(remote.sheetCreates, 1); assert.equal(remote.credentials.length, 3); assert.equal(remote.workflows.size, 1);
+});
+
+test('pull-mode Google read failures retain specific recovery advice and preserve existing resources', async () => {
+  const data = { ...connected(), labelsReady: true, spreadsheetId: 'qa_sheet_123456789012345', gmailCredentialId: 'qa-gmail', sheetsCredentialId: 'qa-sheets', crmCredentialId: 'qa-crm', tokenRegistered: true, workflowId: 'qa-workflow' };
+  const repo = repository(data), pull = { ...config, mode: 'pull' };
+  await assert.rejects(advanceConnection(repo, workspace, pull, { request: async () => new Response('{"emailAddress":"other@example.com"}') }), /google-account-changed/);
+  const saved = (await repo.read()).data;
+  assert.equal(saved.phase, 'attention'); assert.equal(saved.error, 'google-account-changed'); assert.equal(saved.pending, undefined);
+  for (const key of ['spreadsheetId', 'gmailCredentialId', 'sheetsCredentialId', 'crmCredentialId', 'workflowId']) assert.equal(saved[key], data[key]);
 });

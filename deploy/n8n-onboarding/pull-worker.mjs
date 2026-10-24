@@ -2,11 +2,11 @@
 // public CRM are outbound. Only fixed setup operations are accepted.
 import { createHash, randomUUID } from 'node:crypto';
 import { importCredential } from './credential-importer.mjs';
+import { canonicalJSON, workflowDigest, workerFailureCodes } from './workflow-integrity.mjs';
+export { canonicalJSON, workflowDigest };
 
-export const canonicalJSON = value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(k => [k, item[k]])) : item);
-export const workflowDigest = workflow => createHash('sha256').update(canonicalJSON({ nodes: workflow.nodes, connections: workflow.connections })).digest('hex');
 export class WorkerError extends Error {
-  constructor(code, uncertain = false) { super(code); this.code = code; this.uncertain = uncertain; }
+  constructor(code, uncertain = false, status = 0) { super(code); this.code = code; this.uncertain = uncertain; this.status = status; }
 }
 export function validateWorkerConfig(value) {
   const crm = new URL(value.crmOrigin), local = new URL(value.n8nOrigin);
@@ -16,11 +16,21 @@ export function validateWorkerConfig(value) {
   return { ...value, crmOrigin: crm.origin, n8nOrigin: local.origin };
 }
 async function jsonRequest(url, init, mutation, request) {
-  try {
-    const response = await request(url, { ...init, redirect: 'manual', signal: AbortSignal.timeout(20000) });
-    if (!response.ok) throw new WorkerError('provider-unavailable', mutation && (response.status >= 500 || [408, 409].includes(response.status)));
-    return await response.json().catch(() => { throw new WorkerError('provider-unavailable', mutation); });
-  } catch (error) { if (error instanceof WorkerError) throw error; throw new WorkerError('provider-unavailable', mutation); }
+  // Only reads retry within a job. Creates, sends and activation never retry
+  // here: their durable journal must first reconcile the previous outcome.
+  const attempts = init.method === 'GET' ? 3 : 1;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const response = await request(url, { ...init, redirect: 'manual', signal: AbortSignal.timeout(20000) });
+      if (!response.ok) throw new WorkerError('provider-unavailable', mutation && (response.status >= 500 || [408, 409].includes(response.status)), response.status);
+      return await response.json().catch(() => { throw new WorkerError('provider-unavailable', mutation); });
+    } catch (error) {
+      const failure = error instanceof WorkerError ? error : new WorkerError('provider-unavailable', mutation);
+      const transient = !failure.status || [408, 429].includes(failure.status) || failure.status >= 500;
+      if (attempt + 1 >= attempts || !transient) throw failure;
+      await new Promise(resolve => setTimeout(resolve, 200 * 2 ** attempt));
+    }
+  }
 }
 export function workerClients(config, request = fetch) {
   return {
@@ -76,11 +86,14 @@ export async function executeWorkerJob(job, config, clients, dependencies = {}) 
     return { status: 'Succeeded', id: checkedId(saved.id) };
   }
   if (!['verify', 'enable', 'pause'].includes(operation) || !/^[a-f0-9]{64}$/.test(payload.graphHash || '')) throw new WorkerError('verification-failed');
-  const id = checkedId(payload.workflowId), saved = await clients.n8n('/workflows/' + id);
+  const id = checkedId(payload.workflowId);
+  let saved;
+  try { saved = await clients.n8n('/workflows/' + id); }
+  catch (error) { if (error instanceof WorkerError && error.status === 404) throw new WorkerError('connection-missing'); throw error; }
   if (saved.name !== 'CustomerLead business ' + workspaceId) throw new WorkerError('verification-failed');
-  if (operation !== 'pause' && workflowDigest(saved) !== payload.graphHash) throw new WorkerError('verification-failed');
+  if (operation !== 'pause' && workflowDigest(saved) !== payload.graphHash) throw new WorkerError('connection-changed');
   if (operation === 'verify') {
-    if (saved.active || saved.activeVersionId) throw new WorkerError('verification-failed');
+    if (saved.active || saved.activeVersionId) throw new WorkerError('connection-active');
     return { status: 'Succeeded', verified: true };
   }
   const enable = operation === 'enable';
@@ -106,7 +119,7 @@ export async function runWorkerOnce(config, clients, journal, execute = executeW
     saved = { ...saved, phase: 'executing' }; await journal.write(saved);
     let result;
     try { result = await execute(saved.job, config, clients); }
-    catch (error) { result = { status: error instanceof WorkerError && !error.uncertain ? 'Failed' : 'Uncertain', code: error?.code === 'verification-failed' ? 'verification-failed' : 'provider-unavailable' }; }
+    catch (error) { result = { status: error instanceof WorkerError && !error.uncertain ? 'Failed' : 'Uncertain', code: workerFailureCodes.includes(error?.code) ? error.code : 'provider-unavailable' }; }
     saved = { ...saved, phase: 'result', result }; await journal.write(saved);
   }
   if (saved.phase !== 'result') throw new WorkerError('invalid-journal');

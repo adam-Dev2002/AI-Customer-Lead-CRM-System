@@ -7,6 +7,20 @@ inside the existing container. Do not replace that container with this image.
 `pull-worker.mjs` handles fixed queued setup jobs, and `run-pull-worker.mjs` keeps
 an encrypted journal so a crash or lost callback cannot repeat an unknown create.
 
+`workflow-integrity.mjs` is shared with the website's connection checker. It
+ignores only a credential's display name when its explicit ID is present; n8n
+resolves these names on reads. Credential IDs/types, executable parameters and
+connections are still compared. Temporary metadata read errors retry up to three
+times; resource creation and activation are never blindly retried.
+The canonical module lives under `templates/leads/lib/connections`; the repository
+worker re-exports it, and the installer copies it into the standalone worker folder.
+
+Use `scripts/install-local-onboarding-worker.ps1 -Restart` to update this worker.
+It sends SIGTERM only to the exact installed onboarding runner and lets its
+current job/callback finish before replacing files. It does not restart n8n,
+remove an encrypted journal, rotate configuration, or affect inquiry workflows.
+If the job cannot drain, installation stops instead of forcing termination.
+
 The remaining image/Compose files below describe a future hosted direct mode.
 
 This is an operator deployment artifact, not an already running hosted service.

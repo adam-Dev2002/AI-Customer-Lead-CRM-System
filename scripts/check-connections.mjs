@@ -90,6 +90,24 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Retry setup step' }).count(), 0);
   assert.equal(await page.getByRole('button', { name: 'Enable inquiry processing' }).count(), 0);
   await page.screenshot({ path: path.join(output, 'uncertain-result.png'), fullPage: true });
+  status = { ...status, phase: 'attention', step: 'verify', pending: false, workerOnline: true, message: 'The final connection check did not finish. Your completed setup is saved. Recheck the connection to try again.', canRetry: true };
+  await page.reload();
+  const recheck = page.getByRole('button', { name: 'Recheck connection', exact: true }); await recheck.waitFor();
+  const beforeRefresh = actions.length;
+  await page.getByRole('button', { name: 'Refresh status', exact: true }).click();
+  assert.equal(actions.length, beforeRefresh, 'Refreshing recovery status must be read-only.');
+  await page.screenshot({ path: path.join(output, 'verification-recovery.png'), fullPage: true });
+  status.workerOnline = false;
+  await page.getByRole('button', { name: 'Refresh status', exact: true }).click();
+  assert(await recheck.isDisabled());
+  await page.getByText('The background service is offline.', { exact: false }).waitFor();
+  status.workerOnline = true;
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some(button => button.textContent.includes('Recheck connection') && !button.disabled), null, { timeout: 20000 });
+  assert.equal(actions.length, beforeRefresh, 'Automatic status recovery must not execute a setup mutation.');
+  const beforeRecheck = actions.length;
+  await recheck.click(); await enable.waitFor();
+  assert.equal(actions.length, beforeRecheck + 1); assert.equal(actions.at(-1).action, 'advance');
+  assert.equal(actions.filter(action => action.action === 'connect').length, 1, 'Recovery must not reauthorize or recreate the business connection.');
   status = { ...status, phase: 'ready', step: 'complete', pending: false, message: '' };
   await page.setViewportSize({ width: 390, height: 844 }); await page.reload(); await enable.waitFor();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
@@ -97,7 +115,7 @@ try {
   await page.evaluate(() => document.documentElement.classList.add('dark')); await page.screenshot({ path: path.join(output, 'ready-mobile-dark.png'), fullPage: true });
   assert.deepEqual(errors, []);
   const snapshot = await (await context.request.get(base + '/api/crm')).json(); assert.equal(snapshot.leads.length, 0); assert.equal(snapshot.mailJobs.length, 0);
-  console.log('Passed isolated connection UI/API checks: old public address redirects with API authentication retained, authentication, worker authentication, owner-only access, origin checks, disabled setup, automatic progress, confirmed asynchronous enable/pause, offline queued setup without mutation retries, uncertain-result stop, mobile/dark layout. Google/n8n were simulated; no real account, Sheet, workflow or email was created.');
+  console.log('Passed isolated connection UI/API checks: old public address redirects with API authentication retained, authentication, worker authentication, owner-only access, origin checks, disabled setup, automatic progress, confirmed asynchronous enable/pause, offline queued setup without mutation retries, uncertain-result stop, safe verification recheck, read-only refresh and automatic offline recovery, mobile/dark layout. Google/n8n were simulated; no real account, Sheet, workflow or email was created.');
 } finally {
   await browser?.close();
   if (server.pid) server.kill('SIGTERM');

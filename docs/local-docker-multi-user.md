@@ -4,6 +4,24 @@ Selected by the owner on 24 October 2026. Hosting migration is deferred. The CRM
 stays at https://ai-customer-lead-crm-system-oyh1.vercel.app and uses its existing
 Supabase project. n8n stays in the existing `n8n` Docker container on this PC.
 
+## Recovering a final connection check
+
+The connection checker compares the workflow's actual credential IDs, node
+parameters and connections. n8n may resolve credential display names differently
+from the submitted template; those labels do not change credential identity and
+are excluded from the shared fingerprint. A different ID or executable graph
+still blocks verification and activation.
+
+Connections offers **Recheck connection** for known failed checks and **Refresh
+status** for a read-only update after repair. Completed Sheets/credential/workflow
+steps are retained. An offline worker disables rechecking until it reconnects;
+attention/ready states refresh status periodically. Unknown mutation results
+retain their existing durable claim and cannot be retried by these controls.
+
+To deploy a worker update, use `scripts/install-local-onboarding-worker.ps1
+-Restart`. It drains the exact onboarding process before installing the shared
+checker and restarting; existing n8n inquiry workflows continue running.
+
 ## How the connection works
 
 Owners sign into separate CRM workspaces, open Connections, and approve Google
