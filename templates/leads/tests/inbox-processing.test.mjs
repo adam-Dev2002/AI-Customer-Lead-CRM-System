@@ -58,5 +58,9 @@ test('workflow reports real checks, empty results, per-email progress and read f
   assert.equal(find('Gmail — Find Unhandled Customer Emails').alwaysOutputData,true);
   assert.equal(workflow.nodes.filter(n=>n.type.endsWith('.scheduleTrigger')).length,4);
   assert.equal(workflow.connections['Gmail — Find Unhandled Customer Emails'].main[1][0].node,'Inbox failure — fetching');
+  for (const name of ['LOOP — One Email At A Time','IF — Eligible Customer Email?','CHECK — Email AI Enabled?','IF — Create Customer Draft?']) {
+    assert.deepEqual(workflow.connections[name].main.slice(0,2),before.connections[name].main,'both normal branches must survive error reporting: '+name);
+    assert.equal(workflow.connections[name].main[2][0].node,'Inbox failure — processing');
+  }
   const count=workflow.nodes.length;addInboxReporting(workflow,'qa-crm');assert.equal(workflow.nodes.length,count,'instrumentation is idempotent');
 });

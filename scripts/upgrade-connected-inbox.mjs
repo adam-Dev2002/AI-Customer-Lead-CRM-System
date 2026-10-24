@@ -26,7 +26,12 @@ if (workflowDigest(saved) === workflowDigest(next)) { console.log('Inbox reporti
 const previous = provisionedWorkflow(data, workspace, config, false);
 const guard = previous.nodes.find(n => n.name === 'Validate business setup');
 guard.parameters.jsCode = guard.parameters.jsCode.slice(0, guard.parameters.jsCode.indexOf('// The n8n Code sandbox')) + "if(new URL(s.crmBaseUrl).origin!==s.crmBaseUrl||!s.crmBaseUrl.startsWith('https://')) throw new Error('Use the HTTPS CRM origin without a trailing slash.');\nreturn $input.all();";
-assert.equal(workflowDigest(saved), workflowDigest(previous), 'The live graph differs from the reviewed original. Stop for review.');
+const firstReportingVersion = structuredClone(next);
+for (const name of ['LOOP — One Email At A Time','IF — Eligible Customer Email?','CHECK — Email AI Enabled?','IF — Create Customer Draft?']) {
+  const outputs=firstReportingVersion.connections[name].main;
+  outputs[1]=outputs.pop();
+}
+assert([workflowDigest(previous),workflowDigest(firstReportingVersion)].includes(workflowDigest(saved)), 'The live graph differs from the reviewed versions. Stop for review.');
 const response = await cloudRequest('/rest/v1/crm_workspace_state?workspace_id=eq.' + workspace + '&select=data');
 const rows = await response.json(), crm = rows[0]?.data;
 assert(crm && !crm.settings.automaticEmailsEnabled && !crm.mailJobs.some(j=>['Queued','Sending'].includes(j.status)), 'Pause outgoing automation and finish pending deliveries before upgrading.');
@@ -38,7 +43,8 @@ const directory='private-integrations/local-onboarding/recovery-backups'; await 
 await writeFile(directory+'/inbox-upgrade-'+Date.now()+'.enc',sealConnection({workflow:saved,connection:record},workspace,config.encryptionKey),{mode:0o600,flag:'wx'});
 const wasActive=Boolean(saved.active);
 if (wasActive) await n8n('/deactivate',{},'POST');
-assert(!(await n8n('')).active, 'Deactivation was not confirmed.');
+const paused=await n8n('');assert(!paused.active, 'Deactivation was not confirmed.');
+assert.equal(workflowDigest(paused),workflowDigest(saved),'The graph changed during repair. Leave paused for review.');
 await n8n('',{...next,settings:{...saved.settings,...next.settings}},'PUT');
 assert.equal(workflowDigest(await n8n('')),workflowDigest(next),'Updated graph was not confirmed. Leave paused for review.');
 if (wasActive) await n8n('/activate',{},'POST');

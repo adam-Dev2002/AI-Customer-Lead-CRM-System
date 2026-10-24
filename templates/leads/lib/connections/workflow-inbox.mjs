@@ -58,7 +58,9 @@ const code=/401|403|invalid.grant|invalid.client|authenticat|permission|access.d
       if (node.onError) continue; // Retain existing AI fallback and delivery rules.
       node.onError = 'continueErrorOutput';
       const connection = workflow.connections[source] ??= { main: [[]] };
-      connection.main[1] = [edge(name)];
+      // IF and Loop nodes have two normal outputs. The error output is added
+      // after BOTH; replacing output 1 would turn a normal branch into a failure.
+      connection.main[Math.max(1, connection.main.length)] = [edge(name)];
     }
   }
   // Retries are limited to read-only Gmail requests. Gmail mutations, drafts,
